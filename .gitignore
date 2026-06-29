@@ -1,0 +1,41 @@
+# Dependencies and build artifacts
+node_modules/
+dashboard/dist/
+__pycache__/
+*.pyc
+.env
+
+# Scratch/debug scripts
+find_api.py
+debug_geo.py
+fix_encoding.py
+check_regions.py
+fix_out.txt
+debug_out.txt
+region_check.txt
+analyze_json.py
+query_api.py
+query_api2.py
+scrape.py
+scrape_js.py
+test_scraper.py
+test_html.html
+
+# Large data files not needed in git
+spb_gas_stations.json
+
+# Unrelated content
+ChatExport_2026-06-19/
+ChatExport_2026-06-19 (1)/
+NotebookLM_Exports/
+transphoto_groups.md
+transphoto_parser.py
+convert_for_notebooklm.py
+infa/
+
+# The database (too large, tracked separately)
+stations.db
+
+# IDE
+.vscode/
+.idea/
