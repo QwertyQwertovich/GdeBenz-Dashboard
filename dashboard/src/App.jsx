@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, createContext, useContext } from 'react';
 import axios from 'axios';
 import ChoroplethMap from './components/Map';
 import CityMap from './components/CityMap';
@@ -8,7 +8,28 @@ import { Fuel } from 'lucide-react';
 
 const API_URL = 'http://localhost:5000/api';
 
-// Priority regions always shown first in the dropdown
+// ─── i18n ──────────────────────────────────────────────────────────────────
+export const LangCtx = createContext({ lang: 'ru', t: k => k });
+
+const STRINGS = {
+  ru: {
+    title: 'GdeBenz Dashboard',
+    allRussia: 'Вся Россия',
+    collectStatus: 'Сбор данных:',
+    active: 'Активен',
+    backToRussia: '← Вся Россия',
+    loading: 'Загрузка...',
+  },
+  en: {
+    title: 'GdeBenz Dashboard',
+    allRussia: 'All Russia',
+    collectStatus: 'Data collection:',
+    active: 'Active',
+    backToRussia: '← All Russia',
+    loading: 'Loading...',
+  },
+};
+
 const PINNED_REGIONS = {
   'russia':       { name: 'Вся Россия',          lat: 61.524,  lon: 105.318 },
   'spb':          { name: 'Санкт-Петербург',      lat: 59.9343, lon: 30.3351 },
@@ -26,10 +47,13 @@ function App() {
   const [confidence, setConfidence] = useState(null);
   const [loading, setLoading] = useState(true);
   const [cityMap, setCityMap] = useState(PINNED_REGIONS);
-  const [regionBounds, setRegionBounds] = useState({}); // name -> bounds from geojson
+  const [regionBounds, setRegionBounds] = useState({});
   const [filters, setFilters] = useState({ city: 'russia', brand: [], fuel: [] });
+  const [lang, setLang] = useState('ru');
 
-  // Load region list
+  const t = useCallback((key) => STRINGS[lang]?.[key] ?? STRINGS.ru[key] ?? key, [lang]);
+  const langCtxValue = { lang, t };
+
   useEffect(() => {
     axios.get(`${API_URL}/regions`).then(res => {
       const fetched = [...res.data].sort((a, b) => a.name.localeCompare(b.name, 'ru'));
@@ -41,7 +65,6 @@ function App() {
         if (!exists) {
           newMap[`region_${i}`] = { name: r.name, lat: r.lat, lon: r.lon };
         } else {
-          // Update lat/lon from computed centroid
           const key = Object.keys(PINNED_REGIONS).find(k => PINNED_REGIONS[k].name === r.name);
           if (key) newMap[key] = { ...newMap[key], lat: r.lat, lon: r.lon };
         }
@@ -51,7 +74,6 @@ function App() {
     }).catch(console.error);
   }, []);
 
-  // Fetch stats
   useEffect(() => {
     const city = cityMap[filters.city];
     if (!city) return;
@@ -70,7 +92,6 @@ function App() {
       .catch(console.error)
       .finally(() => setLoading(false));
 
-    // Fetch confidence separately (it makes external requests)
     if (regionName !== 'Вся Россия') {
       axios.get(`${API_URL}/confidence?${params.toString()}`)
         .then(res => setConfidence(res.data))
@@ -78,13 +99,9 @@ function App() {
     }
   }, [filters, cityMap]);
 
-  // Handle click on map region
   const handleRegionClick = useCallback((regionName) => {
-    // Find key in cityMap
     const key = Object.keys(cityMap).find(k => cityMap[k].name === regionName);
-    if (key) {
-      setFilters(prev => ({ ...prev, city: key, brand: [], fuel: [] }));
-    }
+    if (key) setFilters(prev => ({ ...prev, city: key, brand: [], fuel: [] }));
   }, [cityMap]);
 
   const isRussia = filters.city === 'russia';
@@ -92,60 +109,79 @@ function App() {
   const currentBounds = regionBounds[regionName];
 
   return (
-    <div className="app-container">
-      <header className="header">
-        <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-          <div style={{ background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)', padding: '10px', borderRadius: '12px' }}>
-            <Fuel color="white" size={24} />
-          </div>
-          <div>
-            <h1>GdeBenz Dashboard</h1>
-            {!isRussia && <div style={{ fontSize: '13px', color: '#64748b', marginTop: '2px' }}>
-              <button
-                onClick={() => setFilters(prev => ({ ...prev, city: 'russia' }))}
-                style={{ background: 'none', border: 'none', color: '#3b82f6', cursor: 'pointer', fontSize: '13px', padding: 0 }}
-              >
-                ← Вся Россия
-              </button>
-              {' / '}
-              <span style={{ color: '#94a3b8' }}>{regionName}</span>
-            </div>}
-          </div>
-        </div>
-        <div style={{ color: '#94a3b8', fontSize: '14px' }}>
-          Сбор данных: <b style={{ color: '#10b981' }}>Активен</b>
-        </div>
-      </header>
-
-      <main className="main-content">
-        {/* Sidebar */}
-        <aside className="sidebar">
-          <Filters filters={filters} setFilters={setFilters} cities={cityMap} />
-        </aside>
-
-        {/* Main area */}
-        <section style={{ display: 'flex', flexDirection: 'column', gap: '16px', minHeight: 0, overflow: 'auto' }}>
-          {isRussia ? (
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 430px', gap: '16px', flex: 1, minHeight: '500px' }}>
-              <ChoroplethMap stats={stats} onRegionClick={handleRegionClick} />
-              <div style={{ overflowY: 'auto' }}>
-                <Stats stats={stats} loading={loading} isFullPage={false} regionName="Вся Россия" confidence={null} />
-              </div>
+    <LangCtx.Provider value={langCtxValue}>
+      <div className="app-container">
+        <header className="header">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+            <div style={{ background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)', padding: '10px', borderRadius: '12px' }}>
+              <Fuel color="white" size={24} />
             </div>
-          ) : (
-            /* Region mode: Stats left + CityMap right, side by side */
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 420px', gap: '16px', minHeight: 0 }}>
-              <div style={{ overflow: 'auto', minHeight: 0 }}>
-                <Stats stats={stats} loading={loading} isFullPage={true} regionName={regionName} confidence={confidence} />
-              </div>
-              <div style={{ minHeight: '600px' }}>
-                <CityMap regionName={regionName} filters={filters} bounds={currentBounds} />
-              </div>
+            <div>
+              <h1>{t('title')}</h1>
+              {!isRussia && <div style={{ fontSize: '13px', color: '#64748b', marginTop: '2px' }}>
+                <button
+                  onClick={() => setFilters(prev => ({ ...prev, city: 'russia' }))}
+                  style={{ background: 'none', border: 'none', color: '#3b82f6', cursor: 'pointer', fontSize: '13px', padding: 0 }}
+                >
+                  {t('backToRussia')}
+                </button>
+                {' / '}
+                <span style={{ color: '#94a3b8' }}>{regionName}</span>
+              </div>}
             </div>
-          )}
-        </section>
-      </main>
-    </div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+            {/* Language toggle */}
+            <div style={{ display: 'flex', gap: '4px', background: 'rgba(15,23,42,0.6)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', padding: '3px' }}>
+              {['ru', 'en'].map(l => (
+                <button
+                  key={l}
+                  onClick={() => setLang(l)}
+                  style={{
+                    background: lang === l ? 'rgba(59,130,246,0.3)' : 'transparent',
+                    border: 'none', borderRadius: '5px', color: lang === l ? '#60a5fa' : '#64748b',
+                    cursor: 'pointer', fontSize: '12px', fontWeight: 700, padding: '4px 10px',
+                    textTransform: 'uppercase', transition: 'all 0.15s'
+                  }}
+                >
+                  {l}
+                </button>
+              ))}
+            </div>
+            <div style={{ color: '#94a3b8', fontSize: '14px' }}>
+              {t('collectStatus')} <b style={{ color: '#10b981' }}>{t('active')}</b>
+            </div>
+          </div>
+        </header>
+
+        <main className="main-content">
+          <aside className="sidebar">
+            <Filters filters={filters} setFilters={setFilters} cities={cityMap} lang={lang} />
+          </aside>
+
+          <section style={{ display: 'flex', flexDirection: 'column', gap: '16px', minHeight: 0, overflow: 'auto' }}>
+            {isRussia ? (
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 430px', gap: '16px', flex: 1, minHeight: '500px' }}>
+                <ChoroplethMap stats={stats} onRegionClick={handleRegionClick} lang={lang} />
+                <div style={{ overflowY: 'auto' }}>
+                  <Stats stats={stats} loading={loading} isFullPage={false} regionName={lang === 'en' ? 'All Russia' : 'Вся Россия'} confidence={null} lang={lang} />
+                </div>
+              </div>
+            ) : (
+              /* Region mode: Stats left (wider), CityMap right (2x) */
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '16px', minHeight: 0 }}>
+                <div style={{ overflow: 'auto', minHeight: 0 }}>
+                  <Stats stats={stats} loading={loading} isFullPage={true} regionName={regionName} confidence={confidence} lang={lang} />
+                </div>
+                <div style={{ minHeight: '600px' }}>
+                  <CityMap regionName={regionName} filters={filters} bounds={currentBounds} lang={lang} />
+                </div>
+              </div>
+            )}
+          </section>
+        </main>
+      </div>
+    </LangCtx.Provider>
   );
 }
 

@@ -112,6 +112,23 @@ body {
   letter-spacing: 0.5px;
 }
 
+/* Brand checkbox rows — reset inherited label styles */
+.brand-item {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  padding: 5px 8px;
+  cursor: pointer;
+  border-radius: 5px;
+  transition: background 0.12s;
+  text-transform: none !important;
+  letter-spacing: normal !important;
+  font-weight: 400 !important;
+  margin-bottom: 0 !important;
+  color: #e2e8f0 !important;
+  font-size: 13px !important;
+}
+
 .filter-group select,
 .filter-group input {
   width: 100%;

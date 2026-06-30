@@ -80,12 +80,11 @@ const Filters = ({ filters, setFilters, cities }) => {
             <div style={{ padding: '8px', color: '#475569', fontSize: '12px', textAlign: 'center' }}>Загрузка...</div>
           )}
           {brands.map(b => (
-            <label key={b.name} style={{
-              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-              padding: '5px 8px', cursor: 'pointer', borderRadius: '5px',
-              background: selectedBrands.includes(b.name) ? 'rgba(59,130,246,0.15)' : 'transparent',
-              transition: 'background 0.12s'
-            }}>
+            <label
+              key={b.name}
+              className="brand-item"
+              style={{ background: selectedBrands.includes(b.name) ? 'rgba(59,130,246,0.15)' : 'transparent' }}
+            >
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
                 <input
                   type="checkbox"
@@ -93,11 +92,11 @@ const Filters = ({ filters, setFilters, cities }) => {
                   onChange={() => toggleBrand(b.name)}
                   style={{ accentColor: '#3b82f6', flexShrink: 0 }}
                 />
-                <span style={{ fontSize: '13px', color: '#e2e8f0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {b.name}
                 </span>
               </div>
-              <span style={{ fontSize: '11px', color: '#475569', flexShrink: 0, marginLeft: '6px' }}>{b.count}</span>
+              <span style={{ fontSize: '11px', color: '#64748b', flexShrink: 0, marginLeft: '6px' }}>{b.count}</span>
             </label>
           ))}
         </div>
