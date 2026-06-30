@@ -2,6 +2,7 @@ from flask import Flask, jsonify, request
 from flask_cors import CORS
 import sqlite3
 import os
+import io
 import json
 import urllib.request
 from shapely.geometry import shape, Point
@@ -14,29 +15,49 @@ GEOJSON_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'dashboa
 
 def get_db():
     conn = sqlite3.connect(DB_PATH)
-    conn.text_factory = str
     conn.row_factory = sqlite3.Row
     return conn
 
+# Load GeoJSON regions (for API)
 regions_cache = []
+geojson_data = None
 if os.path.exists(GEOJSON_PATH):
-    import io
     with io.open(GEOJSON_PATH, 'r', encoding='utf-8') as f:
-        geojson = json.load(f)
-        for feature in geojson['features']:
+        geojson_data = json.load(f)
+        for feature in geojson_data['features']:
             geom = shape(feature['geometry'])
             name = feature['properties'].get('name', 'Unknown')
-            regions_cache.append({'name': name, 'geom': geom})
+            # Compute centroid properly
+            centroid = geom.centroid
+            regions_cache.append({
+                'name': name,
+                'geom': geom,
+                'lat': centroid.y,
+                'lon': centroid.x
+            })
+
+def fetch_station_comments(sid):
+    try:
+        url = f"https://gdebenz.ru/api/comments/{sid}"
+        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+        res = urllib.request.urlopen(req, timeout=5).read().decode('utf-8')
+        return json.loads(res)
+    except:
+        return None
+
+# ─── Endpoints ────────────────────────────────────────────────────────────────
 
 @app.route('/api/regions', methods=['GET'])
 def get_regions():
     res = []
     for r in regions_cache:
-        bounds = r['geom'].bounds
-        center_lon = (bounds[0] + bounds[2]) / 2
-        center_lat = (bounds[1] + bounds[3]) / 2
-        radius = max(bounds[2]-bounds[0], bounds[3]-bounds[1]) / 2
-        res.append({'name': r['name'], 'lat': center_lat, 'lon': center_lon, 'radius': radius})
+        bounds = r['geom'].bounds  # (minx, miny, maxx, maxy)
+        res.append({
+            'name': r['name'],
+            'lat': r['lat'],
+            'lon': r['lon'],
+            'bounds': {'minLat': bounds[1], 'maxLat': bounds[3], 'minLon': bounds[0], 'maxLon': bounds[2]}
+        })
     return jsonify(res)
 
 @app.route('/api/brands', methods=['GET'])
@@ -67,8 +88,10 @@ def get_fuels():
         c.execute("SELECT fuels_now FROM stations WHERE fuels_now IS NOT NULL AND fuels_now != ''")
     fuels_set = set()
     for r in c.fetchall():
-        for f in r['fuels_now'].split(','):
-            if f.strip(): fuels_set.add(f.strip())
+        for f in (r['fuels_now'] or '').split(','):
+            f = f.strip()
+            if f:
+                fuels_set.add(f)
     conn.close()
     return jsonify(sorted(list(fuels_set)))
 
@@ -80,144 +103,194 @@ def get_history():
     if not region:
         return jsonify([])
     if region in ('russia', 'Вся Россия'):
-        query = """
-        SELECT strftime('%Y-%m-%d %H:00:00', h.timestamp) as time_bucket,
-               IFNULL(h.status,'unknown') as status,
-               COUNT(DISTINCT h.id) as count
-        FROM station_history h
-        GROUP BY time_bucket, IFNULL(h.status,'unknown')
-        ORDER BY time_bucket ASC
-        """
-        c.execute(query)
+        c.execute("""
+            SELECT strftime('%Y-%m-%d %H:00:00', h.timestamp) as tb,
+                   IFNULL(h.status,'unknown') as st, COUNT(DISTINCT h.id) as cnt
+            FROM station_history h GROUP BY tb, st ORDER BY tb ASC
+        """)
     else:
-        query = """
-        SELECT strftime('%Y-%m-%d %H:00:00', h.timestamp) as time_bucket,
-               IFNULL(h.status,'unknown') as status,
-               COUNT(DISTINCT h.id) as count
-        FROM station_history h
-        JOIN stations s ON h.id = s.id
-        WHERE s.region = ?
-        GROUP BY time_bucket, IFNULL(h.status,'unknown')
-        ORDER BY time_bucket ASC
-        """
-        c.execute(query, (region,))
+        c.execute("""
+            SELECT strftime('%Y-%m-%d %H:00:00', h.timestamp) as tb,
+                   IFNULL(h.status,'unknown') as st, COUNT(DISTINCT h.id) as cnt
+            FROM station_history h JOIN stations s ON h.id=s.id
+            WHERE s.region=? GROUP BY tb, st ORDER BY tb ASC
+        """, (region,))
     rows = c.fetchall()
     conn.close()
-    history_data = {}
+    hist = {}
     for r in rows:
-        tb = r['time_bucket']
-        if tb not in history_data:
-            history_data[tb] = {'yes': 0, 'no': 0, 'low': 0, 'queue': 0, 'unknown': 0}
-        history_data[tb][r['status']] = r['count']
-    res = [{'time': k, **v} for k, v in history_data.items()]
-    return jsonify(res)
+        tb = r['tb']
+        if tb not in hist:
+            hist[tb] = {'yes': 0, 'no': 0, 'low': 0, 'queue': 0, 'unknown': 0}
+        hist[tb][r['st']] = r['cnt']
+    return jsonify([{'time': k, **v} for k, v in hist.items()])
 
 @app.route('/api/stations_map', methods=['GET'])
 def get_stations_map():
-    """For city-level map: return lat/lon/status/brand of stations in region."""
     region = request.args.get('region')
-    brand = request.args.get('brand')
-    fuel = request.args.get('fuel')
+    brands = request.args.getlist('brand')
+    fuels = request.args.getlist('fuel')
     if not region or region in ('russia', 'Вся Россия'):
         return jsonify([])
     conn = get_db()
     c = conn.cursor()
     params = [region]
-    where = " WHERE region = ?"
-    if brand:
-        where += " AND brand = ?"
-        params.append(brand)
-    if fuel:
-        where += " AND fuels_now LIKE ?"
-        params.append(f"%{fuel}%")
+    where = " WHERE region=?"
+    for b in brands:
+        if b:
+            where += " AND brand=?"; params.append(b)
+    for f in fuels:
+        if f:
+            where += " AND fuels_now LIKE ?"; params.append(f'%{f}%')
     c.execute(f"SELECT id, lat, lon, brand, status, fuels_now FROM stations{where} LIMIT 5000", params)
     rows = c.fetchall()
     conn.close()
     return jsonify([dict(r) for r in rows])
 
-def fetch_views(ids):
-    try:
-        url = "https://gdebenz.ru/api/views?ids=" + ",".join(ids)
-        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
-        res = urllib.request.urlopen(req, timeout=5).read().decode('utf-8')
-        return json.loads(res)
-    except:
-        return {}
+@app.route('/api/confidence', methods=['GET'])
+def get_confidence():
+    region = request.args.get('region')
+    brands = request.args.getlist('brand')
+    fuels = request.args.getlist('fuel')
+
+    conn = get_db()
+    c = conn.cursor()
+
+    params = []
+    where = " WHERE 1=1"
+    if region and region not in ('russia', 'Вся Россия'):
+        where += " AND region=?"; params.append(region)
+    for b in brands:
+        if b: where += " AND brand=?"; params.append(b)
+    for f in fuels:
+        if f: where += " AND fuels_now LIKE ?"; params.append(f'%{f}%')
+
+    c.execute(f"SELECT COUNT(*) FROM stations{where}", params)
+    total_stations = c.fetchone()[0]
+
+    # Sample up to 12 stations for confidence
+    c.execute(f"SELECT id FROM stations{where} AND status IS NOT NULL AND status != '' ORDER BY RANDOM() LIMIT 12", params)
+    sample_ids = [r['id'] for r in c.fetchall()]
+    conn.close()
+
+    total_real_count = 0
+    total_conf_pct = 0
+    valid_stations = 0
+
+    import concurrent.futures
+    import datetime
+
+    if sample_ids:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+            results = list(executor.map(fetch_station_comments, sample_ids))
+            
+        for data in results:
+            if data:
+                real_count = data.get('realCount', 0)
+                cb = data.get('confidenceBase', 0)
+                updated = data.get('updated', '')
+                
+                conf_pct = 0
+                if cb and updated:
+                    try:
+                        # naive datetime from string
+                        dt = datetime.datetime.strptime(updated, '%Y-%m-%d %H:%M:%S')
+                        now = datetime.datetime.utcnow()
+                        age_h = (now - dt).total_seconds() / 3600
+                        if age_h <= 8: s = 1 - age_h/8*0.2
+                        elif age_h <= 24: s = 0.8 - 0.45*(age_h-8)/16
+                        else: s = max(0.15, 0.35-0.004*(age_h-24))
+                        
+                        raw = 5 * round(100 * cb * s / 5)
+                        conf_pct = max(5, min(99, raw))
+                    except:
+                        pass
+                
+                total_real_count += real_count
+                total_conf_pct += conf_pct
+                valid_stations += 1
+
+    avg_real = round(total_real_count / valid_stations, 1) if valid_stations > 0 else 0
+    avg_conf = round(total_conf_pct / valid_stations) if valid_stations > 0 else 0
+    
+    # Cap total estimated at something reasonable to avoid absurd numbers for huge regions based on skewed tiny samples
+    est_total_24h = int(avg_real * total_stations)
+
+    return jsonify({
+        'avg_real_count': avg_real,
+        'total_real_estimated': est_total_24h,
+        'avg_confidence_pct': avg_conf,
+        'stations_sampled': valid_stations,
+        'total_stations': total_stations
+    })
 
 @app.route('/api/stats', methods=['GET'])
 def get_stats():
     conn = get_db()
     c = conn.cursor()
     region = request.args.get('region', 'russia')
-    brands = request.args.getlist('brand')  # support multiple
+    brands = request.args.getlist('brand')
     fuels = request.args.getlist('fuel')
 
     params = []
-    where_clause = " WHERE 1=1"
+    where = " WHERE 1=1"
     if region and region not in ('russia', 'Вся Россия'):
-        where_clause += " AND region = ?"
-        params.append(region)
-    for brand in brands:
-        if brand:
-            where_clause += " AND brand = ?"
-            params.append(brand)
-    for fuel in fuels:
-        if fuel:
-            where_clause += " AND fuels_now LIKE ?"
-            params.append(f"%{fuel}%")
+        where += " AND region=?"; params.append(region)
+    for b in brands:
+        if b: where += " AND brand=?"; params.append(b)
+    for f in fuels:
+        if f: where += " AND fuels_now LIKE ?"; params.append(f'%{f}%')
 
     # Status counts
-    c.execute(f"SELECT IFNULL(status,'unknown') as status, COUNT(*) as count FROM stations{where_clause} GROUP BY IFNULL(status,'unknown')", params)
-    status_counts = {r['status']: r['count'] for r in c.fetchall()}
+    c.execute(f"SELECT IFNULL(status,'unknown') as st, COUNT(*) as cnt FROM stations{where} GROUP BY st", params)
+    status_counts = {r['st']: r['cnt'] for r in c.fetchall()}
 
-    # Top 10 brands by count, with breakdown
-    c.execute(f"SELECT IFNULL(brand,'Unknown') as brand, COUNT(*) as count FROM stations{where_clause} GROUP BY IFNULL(brand,'Unknown') ORDER BY count DESC LIMIT 10", params)
-    top_brands_rows = c.fetchall()
-    top_brands = [row['brand'] for row in top_brands_rows]
-
+    # Top 10 brands + breakdown
+    c.execute(f"SELECT IFNULL(brand,'Unknown') as brand, COUNT(*) as cnt FROM stations{where} GROUP BY brand ORDER BY cnt DESC LIMIT 10", params)
+    top_brands = [r['brand'] for r in c.fetchall()]
     brand_breakdown = {}
     if top_brands:
-        placeholders = ','.join(['?'] * len(top_brands))
-        q = (f"SELECT IFNULL(brand,'Unknown') as brand, IFNULL(status,'unknown') as status, COUNT(*) as count "
-             f"FROM stations{where_clause} AND IFNULL(brand,'Unknown') IN ({placeholders}) "
-             f"GROUP BY IFNULL(brand,'Unknown'), IFNULL(status,'unknown')")
-        c.execute(q, params + top_brands)
+        ph = ','.join(['?'] * len(top_brands))
+        c.execute(
+            f"SELECT IFNULL(brand,'Unknown') as brand, IFNULL(status,'unknown') as st, COUNT(*) as cnt "
+            f"FROM stations{where} AND IFNULL(brand,'Unknown') IN ({ph}) GROUP BY brand, st",
+            params + top_brands
+        )
         for row in c.fetchall():
             b = row['brand']
-            s = row['status']
             if b not in brand_breakdown:
                 brand_breakdown[b] = {'total': 0, 'yes': 0, 'no': 0, 'queue': 0, 'low': 0, 'unknown': 0}
-            brand_breakdown[b][s] = row['count']
-            brand_breakdown[b]['total'] += row['count']
+            brand_breakdown[b][row['st']] = row['cnt']
+            brand_breakdown[b]['total'] += row['cnt']
 
-    # Region stats (for choropleth map on Russia view)
+    # Region stats for choropleth map
+    # Apply brand/fuel filters if set, otherwise global
     region_stats = {}
     if region in ('russia', 'Вся Россия'):
-        c.execute("SELECT region, IFNULL(status,'unknown') as status, COUNT(*) as count FROM stations GROUP BY region, IFNULL(status,'unknown')")
+        region_filter_params = []
+        region_filter = " WHERE 1=1"
+        for b in brands:
+            if b: region_filter += " AND brand=?"; region_filter_params.append(b)
+        for f in fuels:
+            if f: region_filter += " AND fuels_now LIKE ?"; region_filter_params.append(f'%{f}%')
+        
+        c.execute(
+            f"SELECT region, IFNULL(status,'unknown') as st, COUNT(*) as cnt "
+            f"FROM stations{region_filter} GROUP BY region, st",
+            region_filter_params
+        )
         for row in c.fetchall():
             r = row['region']
             if r not in region_stats:
                 region_stats[r] = {'total': 0, 'yes': 0, 'no': 0, 'queue': 0, 'low': 0, 'unknown': 0}
-            region_stats[r][row['status']] = row['count']
-            region_stats[r]['total'] += row['count']
-
-    # Confidence sampling (30 random stations, fetch views)
-    avg_views = 0
-    if region and region not in ('russia', 'Вся Россия'):
-        c.execute(f"SELECT id FROM stations{where_clause} AND status != 'unknown' AND status IS NOT NULL ORDER BY RANDOM() LIMIT 30", params)
-        sample_ids = [row['id'] for row in c.fetchall()]
-        if sample_ids:
-            views_data = fetch_views(sample_ids)
-            if views_data:
-                total_views = sum(views_data.values())
-                avg_views = round(total_views / len(views_data))
+            region_stats[r][row['st']] = row['cnt']
+            region_stats[r]['total'] += row['cnt']
 
     conn.close()
     return jsonify({
         'status': status_counts,
         'brands_breakdown': brand_breakdown,
         'regions': region_stats,
-        'confidence_views': avg_views
     })
 
 if __name__ == '__main__':

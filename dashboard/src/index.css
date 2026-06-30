@@ -55,7 +55,7 @@ body {
 
 .main-content {
   display: grid;
-  grid-template-columns: 320px 1fr;
+  grid-template-columns: 300px 1fr;
   gap: 20px;
   flex: 1;
   min-height: 0;
@@ -78,9 +78,8 @@ body {
 .sidebar {
   display: flex;
   flex-direction: column;
-  gap: 20px;
   overflow-y: auto;
-  padding-right: 5px;
+  padding-right: 4px;
 }
 
 .glass-panel {
