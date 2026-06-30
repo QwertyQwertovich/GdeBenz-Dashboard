@@ -74,38 +74,50 @@ const Filters = ({ filters, setFilters, cities, lang }) => {
           background: 'rgba(15,23,42,0.6)',
           border: '1px solid rgba(255,255,255,0.1)',
           borderRadius: '8px',
-          padding: '6px'
+          padding: '6px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '4px'
         }}>
           {brands.length === 0 && (
             <div style={{ padding: '8px', color: '#475569', fontSize: '12px', textAlign: 'center' }}>
               {lang === 'en' ? 'Loading...' : 'Загрузка...'}
             </div>
           )}
-          {brands.map(b => (
-            <div
-              key={b.name}
-              onClick={() => toggleBrand(b.name)}
-              style={{
-                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                padding: '5px 8px', cursor: 'pointer', borderRadius: '5px',
-                background: selectedBrands.includes(b.name) ? 'rgba(59,130,246,0.15)' : 'transparent',
-                transition: 'background 0.12s', userSelect: 'none'
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
-                <input
-                  type="checkbox"
-                  readOnly
-                  checked={selectedBrands.includes(b.name)}
-                  style={{ accentColor: '#3b82f6', flexShrink: 0, pointerEvents: 'none' }}
-                />
-                <span style={{ fontSize: '13px', color: '#e2e8f0', flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          {brands.map(b => {
+            const isSelected = selectedBrands.includes(b.name);
+            return (
+              <div
+                key={b.name}
+                onClick={() => toggleBrand(b.name)}
+                style={{
+                  display: 'grid', gridTemplateColumns: '16px 1fr auto', gap: '10px', alignItems: 'center',
+                  padding: '6px 10px', cursor: 'pointer', borderRadius: '6px',
+                  background: isSelected ? 'rgba(59,130,246,0.15)' : 'transparent',
+                  border: isSelected ? '1px solid rgba(59,130,246,0.3)' : '1px solid transparent',
+                  transition: 'all 0.2s ease', userSelect: 'none'
+                }}
+              >
+                <div style={{
+                  width: '16px', height: '16px', borderRadius: '4px',
+                  border: isSelected ? 'none' : '1px solid #64748b',
+                  background: isSelected ? '#3b82f6' : 'rgba(15,23,42,0.5)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  transition: 'all 0.2s ease'
+                }}>
+                  {isSelected && (
+                    <svg width="10" height="8" viewBox="0 0 10 8" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M1 4L3.5 6.5L9 1" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                  )}
+                </div>
+                <div style={{ fontSize: '13px', color: isSelected ? '#ffffff' : '#cbd5e1', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                   {b.name || 'Unknown'}
-                </span>
+                </div>
+                <span style={{ fontSize: '11px', color: isSelected ? '#93c5fd' : '#64748b', fontWeight: 500 }}>{b.count}</span>
               </div>
-              <span style={{ fontSize: '11px', color: '#64748b', flexShrink: 0, marginLeft: '6px' }}>{b.count}</span>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
     </div>

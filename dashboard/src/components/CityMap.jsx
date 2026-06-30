@@ -8,9 +8,13 @@ const API_URL = 'http://localhost:5000/api';
 const STATUS_COLORS = {
   yes: '#10b981', low: '#facc15', queue: '#f59e0b', no: '#ef4444', unknown: '#475569'
 };
-const STATUS_LABELS = {
+const STATUS_LABELS_RU = {
   yes: 'Есть топливо', low: 'Заканчивается', queue: 'Очередь', no: 'Нет топлива', unknown: 'Нет данных'
 };
+const STATUS_LABELS_EN = {
+  yes: 'Fuel OK', low: 'Low fuel', queue: 'Queue', no: 'No fuel', unknown: 'No data'
+};
+const getStatusLabels = (lang) => lang === 'en' ? STATUS_LABELS_EN : STATUS_LABELS_RU;
 
 // Component to fit the map to bounds when they change
 function BoundsUpdater({ bounds }) {
@@ -29,9 +33,11 @@ function BoundsUpdater({ bounds }) {
   return null;
 }
 
-const CityMap = ({ regionName, filters, bounds }) => {
+const CityMap = ({ regionName, filters, bounds, lang }) => {
   const [stations, setStations] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [mapStyle, setMapStyle] = useState('dark');
+  const labels = getStatusLabels(lang);
 
   useEffect(() => {
     if (!regionName || regionName === 'Вся Россия') return;
@@ -69,14 +75,26 @@ const CityMap = ({ regionName, filters, bounds }) => {
         display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0
       }}>
         <span style={{ fontSize: '13px', fontWeight: 600, color: '#f8fafc' }}>
-          {loading ? 'Загрузка...' : `Карта АЗС: ${stations.length}`}
+          {loading ? (lang === 'en' ? 'Loading...' : 'Загрузка...') : (lang === 'en' ? `Gas Stations: ${stations.length}` : `Карта АЗС: ${stations.length}`)}
         </span>
         {/* Mini legend */}
-        <div style={{ display: 'flex', gap: '8px' }}>
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+          <button 
+            onClick={() => setMapStyle(prev => prev === 'dark' ? 'light' : 'dark')}
+            style={{ 
+              display: 'flex', alignItems: 'center', gap: '4px',
+              background: 'rgba(59,130,246,0.2)', border: '1px solid rgba(59,130,246,0.5)', 
+              color: '#60a5fa', padding: '4px 8px', borderRadius: '6px', 
+              fontSize: '11px', cursor: 'pointer', marginRight: '10px',
+              transition: 'all 0.2s', fontWeight: 500
+            }}
+          >
+            {mapStyle === 'dark' ? (lang === 'en' ? '☀️ Light map' : '☀️ Светлая карта') : (lang === 'en' ? '🌙 Dark map' : '🌙 Темная карта')}
+          </button>
           {['yes', 'low', 'queue', 'no'].map(k => (
             <div key={k} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
               <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: STATUS_COLORS[k] }} />
-              <span style={{ fontSize: '10px', color: '#64748b' }}>{STATUS_LABELS[k]}</span>
+              <span style={{ fontSize: '10px', color: '#64748b' }}>{labels[k]}</span>
             </div>
           ))}
         </div>
@@ -91,7 +109,7 @@ const CityMap = ({ regionName, filters, bounds }) => {
           attributionControl={false}
         >
           <TileLayer
-            url={lang === 'en' 
+            url={mapStyle === 'light' 
               ? "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
               : "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
             }
@@ -111,9 +129,9 @@ const CityMap = ({ regionName, filters, bounds }) => {
             >
               <Tooltip>
                 <div style={{ fontSize: '12px', color: '#0f172a' }}>
-                  <b>{s.brand || 'Неизвестно'}</b><br />
-                  {STATUS_LABELS[s.status] || 'Нет данных'}
-                  {s.fuels_now && <><br /><span>Топливо: {s.fuels_now}</span></>}
+                  <b>{s.brand || (lang === 'en' ? 'Unknown' : 'Неизвестно')}</b><br />
+                  {labels[s.status] || (lang === 'en' ? 'No data' : 'Нет данных')}
+                  {s.fuels_now && <><br /><span>{lang === 'en' ? 'Fuel:' : 'Топливо:'} {s.fuels_now}</span></>}
                 </div>
               </Tooltip>
             </CircleMarker>
