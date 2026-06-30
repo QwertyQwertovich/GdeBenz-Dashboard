@@ -153,8 +153,9 @@ const ChoroplethMap = ({ stats, onRegionClick, lang = 'ru' }) => {
 
   const onEachBase = (feature, layer) => {
     const name = feature.properties.name;
+    const displayName = lang === 'en' ? (feature.properties.name_latin || name) : name;
     const rStats = getRS(name);
-    layer.bindTooltip(buildTooltip(name, rStats), { sticky: true });
+    layer.bindTooltip(buildTooltip(displayName, rStats), { sticky: true });
     const bs = baseStyle(feature);
     layer.on({
       mouseover: e => e.target.setStyle({ fillOpacity: Math.min(1, (bs.fillOpacity||0.5) + 0.2), weight: 2, color: 'rgba(255,255,255,0.4)' }),

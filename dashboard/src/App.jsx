@@ -31,15 +31,15 @@ const STRINGS = {
 };
 
 const PINNED_REGIONS = {
-  'russia':       { name: 'Вся Россия',          lat: 61.524,  lon: 105.318 },
-  'spb':          { name: 'Санкт-Петербург',      lat: 59.9343, lon: 30.3351 },
-  'msk':          { name: 'Москва',               lat: 55.7558, lon: 37.6173 },
-  'crimea':       { name: 'Республика Крым',      lat: 45.2828, lon: 34.2081 },
-  'sevastopol':   { name: 'Севастополь',          lat: 44.6166, lon: 33.5254 },
-  'dpr':          { name: 'ДНР',                  lat: 48.0159, lon: 37.8028 },
-  'lpr':          { name: 'ЛНР',                  lat: 48.574,  lon: 39.3078 },
-  'zaporizhzhia': { name: 'Запорожская область',  lat: 47.1685, lon: 35.6989 },
-  'kherson':      { name: 'Херсонская область',   lat: 46.5445, lon: 33.3934 },
+  'russia':       { name: 'Вся Россия',          enName: 'All Russia',         lat: 61.524,  lon: 105.318 },
+  'spb':          { name: 'Санкт-Петербург',      enName: 'St. Petersburg',     lat: 59.9343, lon: 30.3351 },
+  'msk':          { name: 'Москва',               enName: 'Moscow',             lat: 55.7558, lon: 37.6173 },
+  'crimea':       { name: 'Республика Крым',      enName: 'Republic of Crimea', lat: 45.2828, lon: 34.2081 },
+  'sevastopol':   { name: 'Севастополь',          enName: 'Sevastopol',         lat: 44.6166, lon: 33.5254 },
+  'dpr':          { name: 'ДНР',                  enName: 'Donetsk People\'s Republic', lat: 48.0159, lon: 37.8028 },
+  'lpr':          { name: 'ЛНР',                  enName: 'Luhansk People\'s Republic', lat: 48.574,  lon: 39.3078 },
+  'zaporizhzhia': { name: 'Запорожская область',  enName: 'Zaporizhzhia Oblast',lat: 47.1685, lon: 35.6989 },
+  'kherson':      { name: 'Херсонская область',   enName: 'Kherson Oblast',     lat: 46.5445, lon: 33.3934 },
 };
 
 function App() {
@@ -63,10 +63,10 @@ function App() {
         boundsMap[r.name] = r.bounds;
         const exists = Object.values(PINNED_REGIONS).some(p => p.name === r.name);
         if (!exists) {
-          newMap[`region_${i}`] = { name: r.name, lat: r.lat, lon: r.lon };
+          newMap[`region_${i}`] = { name: r.name, enName: r.name_latin || r.name, lat: r.lat, lon: r.lon };
         } else {
           const key = Object.keys(PINNED_REGIONS).find(k => PINNED_REGIONS[k].name === r.name);
-          if (key) newMap[key] = { ...newMap[key], lat: r.lat, lon: r.lon };
+          if (key) newMap[key] = { ...newMap[key], enName: r.name_latin || newMap[key].enName || r.name, lat: r.lat, lon: r.lon };
         }
       });
       setCityMap(newMap);
@@ -106,6 +106,7 @@ function App() {
 
   const isRussia = filters.city === 'russia';
   const regionName = cityMap[filters.city]?.name;
+  const regionDisplayName = lang === 'en' ? (cityMap[filters.city]?.enName || regionName) : regionName;
   const currentBounds = regionBounds[regionName];
 
   return (
@@ -126,7 +127,7 @@ function App() {
                   {t('backToRussia')}
                 </button>
                 {' / '}
-                <span style={{ color: '#94a3b8' }}>{regionName}</span>
+                <span style={{ color: '#94a3b8' }}>{regionDisplayName}</span>
               </div>}
             </div>
           </div>
@@ -162,16 +163,22 @@ function App() {
           <section style={{ display: 'flex', flexDirection: 'column', gap: '16px', minHeight: 0, overflow: 'auto' }}>
             {isRussia ? (
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 430px', gap: '16px', flex: 1, minHeight: '500px' }}>
-                <ChoroplethMap stats={stats} onRegionClick={handleRegionClick} lang={lang} />
+                <ChoroplethMap stats={stats} onRegionClick={handleRegionClick} lang={lang} cityMap={cityMap} />
                 <div style={{ overflowY: 'auto' }}>
-                  <Stats stats={stats} loading={loading} isFullPage={false} regionName={lang === 'en' ? 'All Russia' : 'Вся Россия'} confidence={null} lang={lang} />
+                  <Stats stats={stats} loading={loading} isFullPage={false}
+                    apiRegionName="Вся Россия"
+                    displayName={lang === 'en' ? 'All Russia' : 'Вся Россия'}
+                    confidence={confidence} lang={lang} />
                 </div>
               </div>
             ) : (
-              /* Region mode: Stats left (wider), CityMap right (2x) */
+              /* Region mode: Stats left, CityMap right (2x) */
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '16px', minHeight: 0 }}>
                 <div style={{ overflow: 'auto', minHeight: 0 }}>
-                  <Stats stats={stats} loading={loading} isFullPage={true} regionName={regionName} confidence={confidence} lang={lang} />
+                  <Stats stats={stats} loading={loading} isFullPage={true}
+                    apiRegionName={regionName}
+                    displayName={regionDisplayName}
+                    confidence={confidence} lang={lang} />
                 </div>
                 <div style={{ minHeight: '600px' }}>
                   <CityMap regionName={regionName} filters={filters} bounds={currentBounds} lang={lang} />

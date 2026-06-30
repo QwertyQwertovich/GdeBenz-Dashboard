@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import axios from "axios";
 import {
   PieChart, Pie, Cell, Tooltip, ResponsiveContainer,
@@ -90,19 +90,19 @@ const BarLabelPct = ({ x, y, width, value, total }) => {
   );
 };
 
-const Stats = ({ stats, loading, isFullPage, regionName, confidence, lang = "ru" }) => {
+const Stats = ({ stats, loading, isFullPage, apiRegionName, displayName, confidence, lang = "ru" }) => {
   const [ignoreUnknown, setIgnoreUnknown] = useState(false);
   const [historyData, setHistoryData] = useState([]);
   const u = UI[lang] || UI.ru;
   const SL = LABELS[lang] || LABELS.ru;
 
   useEffect(() => {
-    if (regionName) {
-      axios.get(`${API_URL}/history?region=${encodeURIComponent(regionName)}`)
+    if (apiRegionName) {
+      axios.get(`${API_URL}/history?region=${encodeURIComponent(apiRegionName)}`)
         .then(res => setHistoryData(res.data))
         .catch(console.error);
     }
-  }, [regionName]);
+  }, [apiRegionName]);
 
   if (loading) return (
     <div className="glass-panel" style={{ display: "flex", alignItems: "center", gap: "12px", padding: "24px" }}>
@@ -167,7 +167,7 @@ const Stats = ({ stats, loading, isFullPage, regionName, confidence, lang = "ru"
   return (
     <div className="glass-panel stats-panel" style={{ padding: "20px", display: "flex", flexDirection: "column", gap: "16px" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <h2 style={{ margin: 0, fontSize: "16px", fontWeight: 700 }}>{regionName}</h2>
+        <h2 style={{ margin: 0, fontSize: "16px", fontWeight: 700 }}>{displayName}</h2>
         <label style={{ fontSize: "12px", display: "flex", alignItems: "center", gap: "6px", cursor: "pointer", color: "#64748b", userSelect: "none" }}>
           <input type="checkbox" checked={ignoreUnknown} onChange={e => setIgnoreUnknown(e.target.checked)} style={{ accentColor: "#3b82f6" }} />
           {u.withoutUnknown}

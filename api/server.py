@@ -27,10 +27,12 @@ if os.path.exists(GEOJSON_PATH):
         for feature in geojson_data['features']:
             geom = shape(feature['geometry'])
             name = feature['properties'].get('name', 'Unknown')
+            name_latin = feature['properties'].get('name_latin', name)
             # Compute centroid properly
             centroid = geom.centroid
             regions_cache.append({
                 'name': name,
+                'name_latin': name_latin,
                 'geom': geom,
                 'lat': centroid.y,
                 'lon': centroid.x
@@ -54,6 +56,7 @@ def get_regions():
         bounds = r['geom'].bounds  # (minx, miny, maxx, maxy)
         res.append({
             'name': r['name'],
+            'name_latin': r['name_latin'],
             'lat': r['lat'],
             'lon': r['lon'],
             'bounds': {'minLat': bounds[1], 'maxLat': bounds[3], 'minLon': bounds[0], 'maxLon': bounds[2]}
@@ -168,8 +171,8 @@ def get_confidence():
     c.execute(f"SELECT COUNT(*) FROM stations{where}", params)
     total_stations = c.fetchone()[0]
 
-    # Sample up to 12 stations for confidence
-    c.execute(f"SELECT id FROM stations{where} AND status IS NOT NULL AND status != '' ORDER BY RANDOM() LIMIT 12", params)
+    # Sample up to 30 stations for confidence
+    c.execute(f"SELECT id FROM stations{where} AND status IS NOT NULL AND status != '' ORDER BY RANDOM() LIMIT 30", params)
     sample_ids = [r['id'] for r in c.fetchall()]
     conn.close()
 
