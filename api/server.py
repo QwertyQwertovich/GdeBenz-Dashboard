@@ -20,6 +20,16 @@ def get_db():
     conn.row_factory = sqlite3.Row
     return conn
 
+@app.route('/api/time_bounds', methods=['GET'])
+def get_time_bounds():
+    conn = get_db()
+    c = conn.cursor()
+    c.execute("SELECT DISTINCT strftime('%Y-%m-%d %H:00:00', timestamp) as h FROM station_history WHERE timestamp IS NOT NULL ORDER BY h ASC")
+    rows = c.fetchall()
+    conn.close()
+    timestamps = [r[0] for r in rows if r[0]]
+    return jsonify({"timestamps": timestamps})
+
 # Load GeoJSON regions (for API)
 regions_cache = []
 geojson_data = None
@@ -147,7 +157,21 @@ def get_stations_map():
     for f in fuels:
         if f:
             where += " AND fuels_now LIKE ?"; params.append(f'%{f}%')
-    c.execute(f"SELECT id, lat, lon, brand, status, fuels_now FROM stations{where} LIMIT 5000", params)
+    time_at = request.args.get('time_at')
+    if time_at:
+        query = f"""
+            SELECT sub.id, sub.lat, sub.lon, sub.brand, sub.status, sub.fuels_now
+            FROM (
+                SELECT id, lat, lon, brand, fuels_now,
+                       (SELECT status FROM station_history h WHERE h.id = s.id AND h.timestamp <= ? ORDER BY timestamp DESC LIMIT 1) as status
+                FROM stations s {where}
+            ) sub
+            WHERE sub.status IS NOT NULL AND sub.status != ''
+            LIMIT 5000
+        """
+        c.execute(query, [time_at] + params)
+    else:
+        c.execute(f"SELECT id, lat, lon, brand, status, fuels_now FROM stations{where} LIMIT 5000", params)
     rows = c.fetchall()
     conn.close()
     return jsonify([dict(r) for r in rows])
@@ -170,7 +194,16 @@ def get_confidence():
     for f in fuels:
         if f: where += " AND fuels_now LIKE ?"; params.append(f'%{f}%')
 
-    c.execute(f"SELECT COUNT(*) FROM stations{where}", params)
+    time_at = request.args.get('time_at')
+    if time_at:
+        c.execute(f"""
+            SELECT COUNT(*) FROM (
+                SELECT (SELECT status FROM station_history h WHERE h.id = s.id AND h.timestamp <= ? ORDER BY timestamp DESC LIMIT 1) as status
+                FROM stations s {where}
+            ) sub WHERE sub.status IS NOT NULL AND sub.status != ''
+        """, [time_at] + params)
+    else:
+        c.execute(f"SELECT COUNT(*) FROM stations{where}", params)
     total_stations = c.fetchone()[0]
 
     # Sample up to 30 stations for confidence
@@ -292,20 +325,54 @@ def get_stats():
         if f: where += " AND fuels_now LIKE ?"; params.append(f'%{f}%')
 
     # Status counts
-    c.execute(f"SELECT IFNULL(status,'unknown') as st, COUNT(*) as cnt FROM stations{where} GROUP BY st", params)
+    time_at = request.args.get('time_at')
+    if time_at:
+        query = f"""
+            SELECT IFNULL(sub.status, 'unknown') as st, COUNT(*) as cnt
+            FROM (
+                SELECT (SELECT status FROM station_history h WHERE h.id = s.id AND h.timestamp <= ? ORDER BY timestamp DESC LIMIT 1) as status
+                FROM stations s {where}
+            ) sub
+            GROUP BY st
+        """
+        c.execute(query, [time_at] + params)
+    else:
+        c.execute(f"SELECT IFNULL(status,'unknown') as st, COUNT(*) as cnt FROM stations{where} GROUP BY st", params)
     status_counts = {r['st']: r['cnt'] for r in c.fetchall()}
 
     # Top 10 brands + breakdown
-    c.execute(f"SELECT IFNULL(brand,'Unknown') as brand, COUNT(*) as cnt FROM stations{where} GROUP BY brand ORDER BY cnt DESC LIMIT 10", params)
+    if time_at:
+        c.execute(f"""
+            SELECT IFNULL(sub.brand,'Unknown') as brand, COUNT(*) as cnt 
+            FROM (
+                SELECT brand, (SELECT status FROM station_history h WHERE h.id = s.id AND h.timestamp <= ? ORDER BY timestamp DESC LIMIT 1) as status
+                FROM stations s {where}
+            ) sub
+            WHERE sub.status IS NOT NULL AND sub.status != '' AND sub.status != 'unknown'
+            GROUP BY brand ORDER BY cnt DESC LIMIT 10
+        """, [time_at] + params)
+    else:
+        c.execute(f"SELECT IFNULL(brand,'Unknown') as brand, COUNT(*) as cnt FROM stations{where} GROUP BY brand ORDER BY cnt DESC LIMIT 10", params)
     top_brands = [r['brand'] for r in c.fetchall()]
     brand_breakdown = {}
     if top_brands:
         ph = ','.join(['?'] * len(top_brands))
-        c.execute(
-            f"SELECT IFNULL(brand,'Unknown') as brand, IFNULL(status,'unknown') as st, COUNT(*) as cnt "
-            f"FROM stations{where} AND IFNULL(brand,'Unknown') IN ({ph}) GROUP BY brand, st",
-            params + top_brands
-        )
+        if time_at:
+            query = f"""
+                SELECT brand, st, COUNT(*) as cnt FROM (
+                    SELECT IFNULL(brand,'Unknown') as brand, 
+                           IFNULL((SELECT status FROM station_history h WHERE h.id = s.id AND h.timestamp <= ? ORDER BY timestamp DESC LIMIT 1), 'unknown') as st
+                    FROM stations s {where} AND IFNULL(brand,'Unknown') IN ({ph})
+                ) sub
+                GROUP BY brand, st
+            """
+            c.execute(query, [time_at] + params + top_brands)
+        else:
+            c.execute(
+                f"SELECT IFNULL(brand,'Unknown') as brand, IFNULL(status,'unknown') as st, COUNT(*) as cnt "
+                f"FROM stations{where} AND IFNULL(brand,'Unknown') IN ({ph}) GROUP BY brand, st",
+                params + top_brands
+            )
         for row in c.fetchall():
             b = row['brand']
             if b not in brand_breakdown:
@@ -324,11 +391,23 @@ def get_stats():
         for f in fuels:
             if f: region_filter += " AND fuels_now LIKE ?"; region_filter_params.append(f'%{f}%')
         
-        c.execute(
-            f"SELECT region, IFNULL(status,'unknown') as st, COUNT(*) as cnt "
-            f"FROM stations{region_filter} GROUP BY region, st",
-            region_filter_params
-        )
+        if time_at:
+            query = f"""
+                SELECT region, st, COUNT(*) as cnt FROM (
+                    SELECT region, 
+                           IFNULL((SELECT status FROM station_history h WHERE h.id = s.id AND h.timestamp <= ? ORDER BY timestamp DESC LIMIT 1), 'unknown') as st
+                    FROM stations s {region_filter}
+                ) sub
+                WHERE region IS NOT NULL AND region != ''
+                GROUP BY region, st
+            """
+            c.execute(query, [time_at] + region_filter_params)
+        else:
+            c.execute(
+                f"SELECT region, IFNULL(status,'unknown') as st, COUNT(*) as cnt "
+                f"FROM stations{region_filter} GROUP BY region, st",
+                region_filter_params
+            )
         for row in c.fetchall():
             r = row['region']
             if not r: continue

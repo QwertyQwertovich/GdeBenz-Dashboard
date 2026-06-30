@@ -39,3 +39,9 @@ stations.db
 # IDE
 .vscode/
 .idea/
+
+*.cjs
+patch_*.py
+check*.py
+fix_*.cjs
+ne_chukotka.txt

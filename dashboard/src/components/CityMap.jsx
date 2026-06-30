@@ -30,13 +30,44 @@ function BoundsUpdater({ bounds }) {
     }
     setTimeout(() => { map.invalidateSize(); }, 300);
   }, [bounds, map]);
+  
+  // Observe container resizes to fix Leaflet rendering bugs (e.g. missing tiles)
+  useEffect(() => {
+    if (!map.getContainer()) return;
+    const observer = new ResizeObserver(() => {
+      map.invalidateSize();
+    });
+    observer.observe(map.getContainer());
+    return () => observer.disconnect();
+  }, [map]);
+
   return null;
 }
 
-const CityMap = ({ regionName, filters, bounds, lang }) => {
+
+const StatusCheckbox = ({ checked, onChange, label, color }) => (
+  <div onClick={() => onChange(!checked)} style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', userSelect: 'none' }}>
+    <div style={{
+      width: '14px', height: '14px', borderRadius: '50%',
+      border: checked ? 'none' : `1px solid ${color}80`,
+      background: checked ? color : 'transparent',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      transition: 'all 0.2s ease',
+      opacity: checked ? 1 : 0.5
+    }}>
+      {checked && (
+        <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#fff' }} />
+      )}
+    </div>
+    <span style={{ fontSize: '11px', color: checked ? '#e2e8f0' : '#64748b', transition: 'color 0.2s ease', whiteSpace: 'nowrap' }}>{label}</span>
+  </div>
+);
+
+const CityMap = ({ regionName, filters, bounds, lang, timeAt }) => {
   const [stations, setStations] = useState([]);
   const [loading, setLoading] = useState(false);
   const [mapStyle, setMapStyle] = useState('dark');
+  const [visibleStatuses, setVisibleStatuses] = useState({ yes: true, low: true, queue: true, no: true, unknown: true });
   const labels = getStatusLabels(lang);
 
   useEffect(() => {
@@ -45,11 +76,12 @@ const CityMap = ({ regionName, filters, bounds, lang }) => {
     const params = new URLSearchParams({ region: regionName });
     (filters.brand || []).forEach(b => params.append('brand', b));
     (filters.fuel || []).forEach(f => params.append('fuel', f));
+    if (timeAt) params.append('time_at', timeAt);
     axios.get(`${API_URL}/stations_map?${params.toString()}`)
       .then(res => setStations(res.data))
       .catch(console.error)
       .finally(() => setLoading(false));
-  }, [regionName, filters]);
+  }, [regionName, filters, timeAt]);
 
   if (!regionName || regionName === 'Вся Россия') return null;
 

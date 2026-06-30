@@ -4,6 +4,7 @@ import ChoroplethMap from './components/Map';
 import CityMap from './components/CityMap';
 import Stats from './components/Stats';
 import { Filters } from './components/Filters';
+import TimeSlider from './components/TimeSlider';
 import { Fuel } from 'lucide-react';
 
 const API_URL = 'http://localhost:5000/api';
@@ -46,6 +47,7 @@ function App() {
   const [stats, setStats] = useState(null);
   const [confidence, setConfidence] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [timeAt, setTimeAt] = useState(null);
   const [cityMap, setCityMap] = useState(PINNED_REGIONS);
   const [regionBounds, setRegionBounds] = useState({});
   const [filters, setFilters] = useState({ city: 'russia', brand: [], fuel: [] });
@@ -86,18 +88,17 @@ function App() {
     if (regionName !== 'Вся Россия') params.append('region', regionName);
     (filters.brand || []).forEach(b => params.append('brand', b));
     (filters.fuel || []).forEach(f => params.append('fuel', f));
+    if (timeAt) params.append('time_at', timeAt);
 
     axios.get(`${API_URL}/stats?${params.toString()}`)
       .then(res => setStats(res.data))
       .catch(console.error)
       .finally(() => setLoading(false));
 
-    if (regionName !== 'Вся Россия') {
-      axios.get(`${API_URL}/confidence?${params.toString()}`)
-        .then(res => setConfidence(res.data))
-        .catch(console.error);
-    }
-  }, [filters, cityMap]);
+    axios.get(`${API_URL}/confidence?${params.toString()}`)
+      .then(res => setConfidence(res.data))
+      .catch(console.error);
+  }, [filters, cityMap, timeAt]);
 
   const handleRegionClick = useCallback((regionName) => {
     const key = Object.keys(cityMap).find(k => cityMap[k].name === regionName);
@@ -157,6 +158,7 @@ function App() {
 
         <main className="main-content">
           <aside className="sidebar">
+            <TimeSlider timeAt={timeAt} setTimeAt={setTimeAt} lang={lang} />
             <Filters filters={filters} setFilters={setFilters} cities={cityMap} lang={lang} />
           </aside>
 
@@ -181,7 +183,7 @@ function App() {
                     confidence={confidence} lang={lang} />
                 </div>
                 <div style={{ minHeight: '600px' }}>
-                  <CityMap regionName={regionName} filters={filters} bounds={currentBounds} lang={lang} />
+                  <CityMap regionName={regionName} filters={filters} bounds={currentBounds} lang={lang} timeAt={timeAt} />
                 </div>
               </div>
             )}

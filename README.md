@@ -1,96 +1,80 @@
-# GdeBenz Dashboard
+# GdeBenz Dashboard: Geospatial Analysis of Fuel Supply Disruptions ⛽📊
 
-Аналитический дашборд для мониторинга ситуации с топливом на АЗС России на основе данных сайта [gdebenz.ru](https://gdebenz.ru).
+![Python](https://img.shields.io/badge/Python-3776AB?style=for-the-badge&logo=python&logoColor=white)
+![Flask](https://img.shields.io/badge/Flask-000000?style=for-the-badge&logo=flask&logoColor=white)
+![SQLite](https://img.shields.io/badge/SQLite-07405E?style=for-the-badge&logo=sqlite&logoColor=white)
+![React](https://img.shields.io/badge/React-20232A?style=for-the-badge&logo=react&logoColor=61DAFB)
+![Leaflet](https://img.shields.io/badge/Leaflet-199900?style=for-the-badge&logo=Leaflet&logoColor=white)
 
-## Возможности
+This repository contains the source code for the **GdeBenz Dashboard**, an analytical tool developed to monitor and evaluate the spatial distribution of the regional fuel crisis in Russia. Triggered by supply chain disruptions and infrastructure damage at refineries, this crisis presents a unique opportunity to study supply shocks under conditions of inelastic demand. 
 
-- 🗺️ **Тепловая карта регионов РФ** — цветовая индикация напряжённости с топливом по всем субъектам
-- 📊 **Аналитика по регионам** — KPI-карточки (%, кол-во), пончиковая диаграмма статусов, топ-10 брендов с разбивкой по слоям
-- 🔍 **Фильтры** — по региону, виду топлива и бренду (мультивыбор)
-- 🗺️ **Карта АЗС города** — при выборе региона показывает точки отдельных заправок
-- 📈 **Динамика** — стэкированная диаграмма изменения ситуации по времени
-- 🤝 **Уверенность (репорты)** — сэмплинг 30 случайных АЗС для оценки активности пользователей
-- ⏱️ **Автосбор данных** — фоновый парсер с задержками для обхода блокировок
+The dashboard aggregates, processes, and visualizes real-time crowdsourced reports to track regional shortages, logistical bottlenecks, and market anomalies.
 
-## Структура проекта
+## 📸 Visualizations
 
-```
-├── api/
-│   └── server.py          # Flask REST API
-├── scraper/
-│   ├── collect.py         # Парсер gdebenz.ru (вся РФ по сетке)
-│   └── db.py              # SQLite хелперы
-├── dashboard/             # Vite + React фронтенд
-│   ├── src/
-│   │   ├── App.jsx
-│   │   └── components/
-│   │       ├── Map.jsx       # Хороплет карта РФ
-│   │       ├── CityMap.jsx   # Карта точек АЗС
-│   │       ├── Stats.jsx     # Графики и статистика
-│   │       └── Filters.jsx   # Панель фильтров
-│   └── public/
-│       └── russia.geojson  # Границы регионов РФ
-├── stations.db            # База данных SQLite
-├── migrate.py             # Миграция: добавление region, history
-└── seed.py                # Загрузка тестовых данных
-```
+### Geospatial Distribution (Macro Level)
+*Choropleth mapping of fuel shortages and data confidence metrics across regions.*
+![All Russia View](assets/russia_view.png)
 
-## Запуск
+### Spatio-Temporal Dynamics (Micro Level)
+*Individual station monitoring with dynamic filtering and historical time-series analysis.*
+![City View](assets/city_view.png)
 
-### 1. Зависимости
+## 🧠 Data Pipeline & Methodology
 
-**Python:**
-```bash
-pip install flask flask-cors shapely
-```
+The project is structured to handle the end-to-end data lifecycle, focusing heavily on data quality and robustness:
 
-**Node.js:**
-```bash
-cd dashboard && npm install
-```
+1. **Data Collection**: Raw status reports are systematically retrieved from the `gdebenz.ru` API using a bounding-box grid strategy — Russia's territory is partitioned into a 5°×5° latitude/longitude grid, and each cell is queried in sequence. The scraper is implemented using Python's standard library (`urllib`, `json`) with randomized delays to avoid rate-limiting.
+2. **Geospatial Processing**: The raw station coordinates are matched to administrative regions via spatial joins using the **Shapely** library against a GeoJSON polygon dataset. Each station record is persisted in an **SQLite** database, which maintains both the current state and a full time-series snapshot log (`station_history` table), enabling historical queries.
+3. **Confidence Metric**: Crowdsourced data is inherently unreliable. To quantify data freshness and reliability, the backend samples up to 30 stations per region and queries the `gdebenz.ru` comments API in parallel (via `concurrent.futures.ThreadPoolExecutor`). For each station, a time-decay weighting function is applied to the raw `confidenceBase` score: reports under 8 hours old retain near-full weight, while reports older than 24 hours decay to a minimum score of 0.15. The resulting per-region average is exposed as a Confidence Metric.
+4. **Backend API**: A **Flask** server executes SQL aggregations on demand, supporting historical queries via a `time_at` parameter that reconstructs past station states from the history log — without the overhead of heavy ORMs or caching layers.
+5. **Frontend Analytics**: The visualization layer is built with **React**, **Vite**, **Recharts**, and **React-Leaflet** to render high-density geospatial data and normalized statistical charts with responsive interactivity.
 
-### 2. API сервер
+## 📉 Macroeconomic Context
+
+The analytics generated by this dashboard allow for empirical observation of classic economic phenomena and market failures:
+- **Supply Shock with Inelastic Demand**: Visualizing the immediate geographic propagation of shortages when critical refinery infrastructure is disrupted, leading to rapid fuel depletion.
+- **Consumer Panic Behavior**: Utilizing the historical Time Machine feature to observe the rapid formation of localized queues, hoarding behavior, and the contagion effect across adjacent gas stations.
+- **Market Structure and Constraints**: Comparing how different market participants (various gas station brands) handle supply stress using normalized breakdown analytics, and tracking the impact of administrative rationing over time.
+
+## 🛠️ How to Run Locally
+
+### 1. Backend & Data Collection
+Ensure you have Python 3.9+ installed.
 
 ```bash
+# Create and activate a virtual environment
+python -m venv venv
+
+# On Windows:
+venv\Scripts\activate
+# On macOS/Linux:
+# source venv/bin/activate
+
+# Install dependencies
+pip install flask shapely
+
+# Start the Flask API server
 python api/server.py
+
+# (Optional) Run the data scraper in a separate terminal to populate the database
+python scraper/collect.py
 ```
 
-Сервер запустится на `http://localhost:5000`
-
-### 3. Фронтенд
+### 2. Frontend Dashboard
+Ensure you have Node.js 18+ installed.
 
 ```bash
-cd dashboard && npm run dev
+cd dashboard
+
+# Install dependencies
+npm install
+
+# Start the Vite development server
+npm run dev
 ```
 
-Откройте `http://localhost:5173`
+Navigate to `http://localhost:5173/` in your browser.
 
-### 4. Сбор данных (по всей РФ)
-
-```bash
-cd scraper && python collect.py
-```
-
-Парсер обходит всю Россию по сетке 5°×5°, делая паузы 1–3 сек. между запросами.  
-Данные пишутся в `stations.db` с сохранением истории.
-
-## API эндпоинты
-
-| Метод | URL | Описание |
-|-------|-----|----------|
-| GET | `/api/stats` | Статистика (фильтры: region, brand, fuel) |
-| GET | `/api/regions` | Список регионов с координатами |
-| GET | `/api/brands` | Бренды АЗС (опционально по region) |
-| GET | `/api/fuels` | Виды топлива (опционально по region) |
-| GET | `/api/history` | История по времени (по region) |
-| GET | `/api/stations_map` | Точки АЗС для карты города |
-
-## Данные
-
-| Статус | Значение |
-|--------|----------|
-| `yes` | Топливо есть |
-| `low` | Заканчивается |
-| `queue` | Очередь |
-| `no` | Нет топлива |
-| `unknown` | Нет данных |
+## 📄 License
+This project is open-source and available under the MIT License.

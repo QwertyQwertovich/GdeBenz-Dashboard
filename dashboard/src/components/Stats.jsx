@@ -40,6 +40,25 @@ const UI = {
 
 const TT_STYLE = { backgroundColor: "#1e293b", border: "none", borderRadius: "8px", color: "#f8fafc", fontSize: "12px" };
 
+const CustomCheckbox = ({ checked, onChange, label }) => (
+  <div onClick={() => onChange(!checked)} style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "pointer", userSelect: "none" }}>
+    <div style={{
+      width: "16px", height: "16px", borderRadius: "4px",
+      border: checked ? "none" : "1px solid #64748b",
+      background: checked ? "#3b82f6" : "rgba(15,23,42,0.5)",
+      display: "flex", alignItems: "center", justifyContent: "center",
+      transition: "all 0.2s ease"
+    }}>
+      {checked && (
+        <svg width="10" height="8" viewBox="0 0 10 8" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M1 4L3.5 6.5L9 1" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
+      )}
+    </div>
+    <span style={{ fontSize: "12px", color: checked ? "#ffffff" : "#94a3b8", transition: "color 0.2s ease" }}>{label}</span>
+  </div>
+);
+
 const KpiCard = ({ label, value, color, sub }) => (
   <div style={{
     flex: 1, minWidth: "100px",
@@ -64,16 +83,41 @@ const ConfidenceBlock = ({ confidence, lang = "ru" }) => {
   if (avg_confidence_pct >= 70) { trustColor = "#22c55e"; trustLabel = u.high; }
   else if (avg_confidence_pct >= 40) { trustColor = "#7dbe3f"; trustLabel = u.med; }
   else if (avg_confidence_pct >= 20) { trustColor = "#e0a52e"; trustLabel = u.low; }
+  
+  const gaugeData = [
+    { name: 'Conf', value: avg_confidence_pct, fill: trustColor },
+    { name: 'Rem', value: 100 - avg_confidence_pct, fill: 'rgba(255,255,255,0.05)' }
+  ];
+
   return (
     <div className="glass-panel" style={{ padding: "14px 16px", marginBottom: "14px" }}>
-      <div style={{ fontSize: "13px", fontWeight: 700, color: "#94a3b8", marginBottom: "10px", display: "flex", alignItems: "center", gap: "8px" }}>
+      <div style={{ fontSize: "13px", fontWeight: 700, color: "#94a3b8", marginBottom: "16px", display: "flex", alignItems: "center", gap: "8px" }}>
         {u.confidence}
         <span style={{ fontSize: "12px", padding: "2px 8px", borderRadius: "999px", background: trustColor + "20", color: trustColor, fontWeight: 600 }}>{trustLabel}</span>
       </div>
-      <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
-        <KpiCard label={u.avgConf} value={`${avg_confidence_pct}%`} color={trustColor} sub={u.avgByRegion} />
-        <KpiCard label={u.reportsPerStation} value={avg_real_count} sub={u.per24h} />
-        <KpiCard label={u.totalReports} value={total_real_estimated?.toLocaleString("ru")} sub={`${u.est} ${stations_sampled} ${u.azs}`} />
+      <div style={{ display: "flex", gap: "20px", flexWrap: "wrap", alignItems: "center" }}>
+        {/* Gauge Chart */}
+        <div style={{ position: "relative", width: "120px", height: "120px" }}>
+          <ResponsiveContainer width="100%" height="100%">
+            <PieChart>
+              <Pie
+                data={gaugeData} cx="50%" cy="50%"
+                innerRadius={45} outerRadius={55}
+                startAngle={225} endAngle={-45}
+                dataKey="value" stroke="none" cornerRadius={5}
+              />
+            </PieChart>
+          </ResponsiveContainer>
+          <div style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)", textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center" }}>
+            <span style={{ fontSize: "24px", fontWeight: 800, color: trustColor, lineHeight: 1 }}>{avg_confidence_pct}%</span>
+          </div>
+        </div>
+        
+        {/* Stats */}
+        <div style={{ flex: 1, display: "flex", gap: "10px", flexWrap: "wrap", minWidth: "200px" }}>
+          <KpiCard label={u.reportsPerStation} value={avg_real_count} sub={u.per24h} />
+          <KpiCard label={u.totalReports} value={total_real_estimated?.toLocaleString("ru")} sub={`${u.est} ${stations_sampled} ${u.azs}`} />
+        </div>
       </div>
     </div>
   );
@@ -93,6 +137,7 @@ const BarLabelPct = ({ x, y, width, value, total }) => {
 const Stats = ({ stats, loading, isFullPage, apiRegionName, displayName, confidence, lang = "ru" }) => {
   const [ignoreUnknown, setIgnoreUnknown] = useState(false);
   const [showPct, setShowPct] = useState(false);
+  const [stackBrands, setStackBrands] = useState(false);
   const [historyData, setHistoryData] = useState([]);
   const u = UI[lang] || UI.ru;
   const SL = LABELS[lang] || LABELS.ru;
@@ -136,7 +181,8 @@ const Stats = ({ stats, loading, isFullPage, apiRegionName, displayName, confide
   }).sort((a, b) => b.total - a.total).slice(0, 10);
 
   const histProcessed = historyData.map(d => {
-    const time = new Date(d.time).toLocaleTimeString(lang === 'en' ? 'en-US' : 'ru-RU', { hour: "2-digit", minute: "2-digit" });
+    // Append Z to parse as UTC
+    const time = new Date(d.time.replace(" ", "T") + "Z").toLocaleTimeString(lang === 'en' ? 'en-US' : 'ru-RU', { hour: "2-digit", minute: "2-digit" });
     const u_val = ignoreUnknown ? 0 : d.unknown;
     const total = (d.yes || 0) + (d.no || 0) + (d.low || 0) + (d.queue || 0) + (u_val || 0);
     if (showPct && total > 0) {
@@ -183,10 +229,7 @@ const Stats = ({ stats, loading, isFullPage, apiRegionName, displayName, confide
     <div className="glass-panel stats-panel" style={{ padding: "20px", display: "flex", flexDirection: "column", gap: "16px" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <h2 style={{ margin: 0, fontSize: "16px", fontWeight: 700 }}>{displayName}</h2>
-        <label style={{ fontSize: "12px", display: "flex", alignItems: "center", gap: "6px", cursor: "pointer", color: "#64748b", userSelect: "none" }}>
-          <input type="checkbox" checked={ignoreUnknown} onChange={e => setIgnoreUnknown(e.target.checked)} style={{ accentColor: "#3b82f6" }} />
-          {u.withoutUnknown}
-        </label>
+        <CustomCheckbox checked={ignoreUnknown} onChange={setIgnoreUnknown} label={u.withoutUnknown} />
       </div>
 
       <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
@@ -222,13 +265,16 @@ const Stats = ({ stats, loading, isFullPage, apiRegionName, displayName, confide
 
         {/* Brand bars */}
         <div>
-          <h3 style={{ fontSize: "13px", color: "#64748b", marginBottom: "6px", fontWeight: 600 }}>{u.topBrands}</h3>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
+            <h3 style={{ fontSize: "13px", color: "#64748b", margin: 0, fontWeight: 600 }}>{u.topBrands}</h3>
+            <CustomCheckbox checked={stackBrands} onChange={setStackBrands} label="%" />
+          </div>
           <div style={{ height: isFullPage ? "300px" : "260px" }}>
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={brandData} margin={{ top: 18, right: 10, left: -20, bottom: 65 }}>
+              <BarChart data={brandData} margin={{ top: 18, right: 10, left: -20, bottom: 65 }} stackOffset={stackBrands ? "expand" : "none"}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
                 <XAxis dataKey="name" stroke="#334155" tick={{ fill: "#e2e8f0", fontSize: 11 }} angle={-45} textAnchor="end" interval={0} />
-                <YAxis stroke="#334155" tick={{ fill: "#64748b", fontSize: 10 }} />
+                <YAxis stroke="#334155" tick={{ fill: "#64748b", fontSize: 10 }} tickFormatter={val => stackBrands ? `${(val * 100).toFixed(0)}%` : val} />
                 <Tooltip content={<BrandTooltip />} />
                 <Legend wrapperStyle={{ fontSize: "10px", paddingTop: "65px" }} />
                 <Bar dataKey="yes" name={SL.yes} stackId="a" fill={SC.yes} />
@@ -246,10 +292,7 @@ const Stats = ({ stats, loading, isFullPage, apiRegionName, displayName, confide
           <div style={{ gridColumn: isFullPage ? "1 / -1" : undefined }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
               <h3 style={{ fontSize: "13px", color: "#64748b", margin: 0, fontWeight: 600 }}>{u.dynamics}</h3>
-              <label style={{ fontSize: "11px", display: "flex", alignItems: "center", gap: "4px", cursor: "pointer", color: "#64748b" }}>
-                <input type="checkbox" checked={showPct} onChange={e => setShowPct(e.target.checked)} style={{ accentColor: "#3b82f6" }} />
-                %
-              </label>
+              <CustomCheckbox checked={showPct} onChange={setShowPct} label="%" />
             </div>
             <div style={{ height: "220px" }}>
               <ResponsiveContainer width="100%" height="100%">
