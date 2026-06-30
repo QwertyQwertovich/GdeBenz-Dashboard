@@ -92,6 +92,7 @@ const BarLabelPct = ({ x, y, width, value, total }) => {
 
 const Stats = ({ stats, loading, isFullPage, apiRegionName, displayName, confidence, lang = "ru" }) => {
   const [ignoreUnknown, setIgnoreUnknown] = useState(false);
+  const [showPct, setShowPct] = useState(false);
   const [historyData, setHistoryData] = useState([]);
   const u = UI[lang] || UI.ru;
   const SL = LABELS[lang] || LABELS.ru;
@@ -135,13 +136,27 @@ const Stats = ({ stats, loading, isFullPage, apiRegionName, displayName, confide
   }).sort((a, b) => b.total - a.total).slice(0, 10);
 
   const histProcessed = historyData.map(d => {
-    const t = new Date(d.time);
-    const entry = {
-      time: `${t.getDate()}.${t.getMonth()+1} ${String(t.getHours()).padStart(2,"0")}:00`,
-      [SL.yes]: d.yes||0, [SL.low]: d.low||0, [SL.queue]: d.queue||0, [SL.no]: d.no||0,
+    const time = new Date(d.time).toLocaleTimeString(lang === 'en' ? 'en-US' : 'ru-RU', { hour: "2-digit", minute: "2-digit" });
+    const u_val = ignoreUnknown ? 0 : d.unknown;
+    const total = (d.yes || 0) + (d.no || 0) + (d.low || 0) + (d.queue || 0) + (u_val || 0);
+    if (showPct && total > 0) {
+      return {
+        time,
+        [SL.yes]: Math.round((d.yes || 0) / total * 100),
+        [SL.no]: Math.round((d.no || 0) / total * 100),
+        [SL.low]: Math.round((d.low || 0) / total * 100),
+        [SL.queue]: Math.round((d.queue || 0) / total * 100),
+        [SL.unknown]: Math.round((u_val || 0) / total * 100),
+      };
+    }
+    return {
+      time,
+      [SL.yes]: d.yes || 0,
+      [SL.no]: d.no || 0,
+      [SL.low]: d.low || 0,
+      [SL.queue]: d.queue || 0,
+      [SL.unknown]: u_val || 0,
     };
-    if (!ignoreUnknown) entry[SL.unknown] = d.unknown||0;
-    return entry;
   });
 
   // Custom tooltip showing count + %
@@ -229,14 +244,20 @@ const Stats = ({ stats, loading, isFullPage, apiRegionName, displayName, confide
         {/* History — Line Chart */}
         {histProcessed.length > 0 && (
           <div style={{ gridColumn: isFullPage ? "1 / -1" : undefined }}>
-            <h3 style={{ fontSize: "13px", color: "#64748b", marginBottom: "6px", fontWeight: 600 }}>{u.dynamics}</h3>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
+              <h3 style={{ fontSize: "13px", color: "#64748b", margin: 0, fontWeight: 600 }}>{u.dynamics}</h3>
+              <label style={{ fontSize: "11px", display: "flex", alignItems: "center", gap: "4px", cursor: "pointer", color: "#64748b" }}>
+                <input type="checkbox" checked={showPct} onChange={e => setShowPct(e.target.checked)} style={{ accentColor: "#3b82f6" }} />
+                %
+              </label>
+            </div>
             <div style={{ height: "220px" }}>
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={histProcessed} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
                   <XAxis dataKey="time" stroke="#334155" tick={{ fill: "#64748b", fontSize: 10 }} interval="preserveStartEnd" />
-                  <YAxis stroke="#334155" tick={{ fill: "#64748b", fontSize: 10 }} />
-                  <Tooltip contentStyle={TT_STYLE} />
+                  <YAxis stroke="#334155" tick={{ fill: "#64748b", fontSize: 10 }} tickFormatter={val => showPct ? `${val}%` : val} />
+                  <Tooltip contentStyle={TT_STYLE} formatter={(value, name) => [showPct ? `${value}%` : value, name]} />
                   <Legend wrapperStyle={{ fontSize: "10px" }} />
                   <Line type="monotone" dataKey={SL.yes} stroke={SC.yes} strokeWidth={2} dot={false} />
                   <Line type="monotone" dataKey={SL.low} stroke={SC.low} strokeWidth={2} dot={false} />

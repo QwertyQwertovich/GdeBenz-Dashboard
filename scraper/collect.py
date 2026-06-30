@@ -14,7 +14,7 @@ CYCLE_INTERVAL_HOURS = 3  # Интервал между полными обхо�
 
 def fetch_stations_for_bbox(lat1, lon1, lat2, lon2):
     url = f'https://gdebenz.ru/api/stations?lat1={lat1}&lon1={lon1}&lat2={lat2}&lon2={lon2}'
-    req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+    req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0', 'Accept': 'application/json', 'Accept-Charset': 'utf-8'})
     try:
         response = urllib.request.urlopen(req, timeout=10).read().decode('utf-8')
         data = json.loads(response)

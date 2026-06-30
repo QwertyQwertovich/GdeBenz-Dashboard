@@ -5,6 +5,8 @@ import os
 import io
 import json
 import urllib.request
+import threading
+import time
 from shapely.geometry import shape, Point
 
 app = Flask(__name__)
@@ -41,7 +43,7 @@ if os.path.exists(GEOJSON_PATH):
 def fetch_station_comments(sid):
     try:
         url = f"https://gdebenz.ru/api/comments/{sid}"
-        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0', 'Accept': 'application/json', 'Accept-Charset': 'utf-8'})
         res = urllib.request.urlopen(req, timeout=5).read().decode('utf-8')
         return json.loads(res)
     except:
@@ -227,6 +229,51 @@ def get_confidence():
         'total_stations': total_stations
     })
 
+# --- Background Thread for Region Confidence ---
+region_avg_reports = {}
+
+def update_region_confidence_loop():
+    while True:
+        try:
+            conn = get_db()
+            c = conn.cursor()
+            # Get all unique regions
+            c.execute("SELECT DISTINCT region FROM stations WHERE region IS NOT NULL AND region != ''")
+            regions = [r['region'] for r in c.fetchall()]
+            
+            for r in regions:
+                c.execute("SELECT id FROM stations WHERE region=? AND status IS NOT NULL AND status != '' ORDER BY RANDOM() LIMIT 10", (r,))
+                sample_ids = [row['id'] for row in c.fetchall()]
+                
+                total_real = 0
+                total_conf = 0
+                valid = 0
+                for sid in sample_ids:
+                    data = fetch_station_comments(sid)
+                    if data:
+                        realCount = data.get('realCount', 0)
+                        cb = data.get('confidenceBase', 0)
+                        if cb > 0:
+                            total_real += realCount
+                            total_conf += cb
+                            valid += 1
+                
+                if total_conf > 0 and valid > 0:
+                    region_avg_reports[r] = round(total_real / valid, 1)
+                else:
+                    region_avg_reports[r] = 0
+                    
+                time.sleep(1) # Be gentle to the API
+                
+            conn.close()
+        except Exception as e:
+            print("Confidence Loop Error:", e)
+            
+        time.sleep(3600) # Update every hour
+
+threading.Thread(target=update_region_confidence_loop, daemon=True).start()
+# -----------------------------------------------
+
 @app.route('/api/stats', methods=['GET'])
 def get_stats():
     conn = get_db()
@@ -284,8 +331,9 @@ def get_stats():
         )
         for row in c.fetchall():
             r = row['region']
+            if not r: continue
             if r not in region_stats:
-                region_stats[r] = {'total': 0, 'yes': 0, 'no': 0, 'queue': 0, 'low': 0, 'unknown': 0}
+                region_stats[r] = {'total': 0, 'yes': 0, 'no': 0, 'queue': 0, 'low': 0, 'unknown': 0, 'avg_reports': region_avg_reports.get(r, 0)}
             region_stats[r][row['st']] = row['cnt']
             region_stats[r]['total'] += row['cnt']
 

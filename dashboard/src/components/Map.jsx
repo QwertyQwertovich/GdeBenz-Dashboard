@@ -138,16 +138,22 @@ const ChoroplethMap = ({ stats, onRegionClick, lang = 'ru' }) => {
     const qualBadge = ql >= 3
       ? `<span style="color:#10b981;font-size:11px">✔ ${lang === 'en' ? 'Sufficient data' : 'Данных достаточно'}</span>`
       : ql === 2
-        ? `<span style="color:#f59e0b;font-size:11px">〰 ${lang === 'en' ? `Low data (${covPct}% coverage)` : `Мало данных (${covPct}% охват)`}</span>`
-        : `<span style="color:#ef4444;font-size:11px">⚠ ${lang === 'en' ? `Very low data (${covPct}% coverage)` : `Очень мало данных (${covPct}% охват)`}</span>`;
+        ? `<span style="color:#f59e0b;font-size:11px">〰 ${lang === 'en' ? `Low data` : `Мало данных`}</span>`
+        : `<span style="color:#ef4444;font-size:11px">⚠ ${lang === 'en' ? `Very low data` : `Очень мало данных`}</span>`;
     return `<div style="font-family:Inter,sans-serif;min-width:190px;padding:4px">
       <div style="font-weight:700;font-size:14px;color:#0f172a;margin-bottom:5px">${name}</div>
       <div style="color:#334155;font-size:12px;margin-bottom:3px">${lang === 'en' ? 'Total' : 'Всего'}: <b>${rStats.total}</b> | ${lang === 'en' ? 'Known' : 'Известно'}: <b>${known}</b></div>
       <div style="color:#10b981;font-size:12px">✔ ${lang === 'en' ? 'Fuel OK' : 'Есть'}: ${rStats.yes||0} (${yesP}%)</div>
       <div style="color:#ef4444;font-size:12px">✘ ${lang === 'en' ? 'No fuel' : 'Нет'}: ${rStats.no||0} (${noP}%)</div>
       <div style="color:#f59e0b;font-size:12px">⏳ ${lang === 'en' ? 'Queue' : 'Очереди'}: ${rStats.queue||0}</div>
-      <div style="margin-top:5px">${qualBadge}</div>
-      ${onRegionClick ? `<div style="color:#3b82f6;font-size:11px;margin-top:3px">${lang === 'en' ? 'Click for details →' : 'Нажмите для деталей →'}</div>` : ''}
+      <div style="margin-top:6px;padding-top:4px;border-top:1px solid #e2e8f0;display:flex;justify-content:space-between;align-items:center;">
+        ${qualBadge}
+      </div>
+      <div style="font-size:11px;color:#64748b;margin-top:2px;">
+        ${lang === 'en' ? 'Coverage' : 'Охват'}: <b>${covPct}%</b> &nbsp;|&nbsp; 
+        ${lang === 'en' ? 'Reports/st' : 'Репортов/АЗС'}: <b>${rStats.avg_reports || 0}</b>
+      </div>
+      ${onRegionClick ? `<div style="color:#3b82f6;font-size:11px;margin-top:4px">${lang === 'en' ? 'Click for details →' : 'Нажмите для деталей →'}</div>` : ''}
     </div>`;
   };
 
@@ -248,6 +254,7 @@ const ChoroplethMap = ({ stats, onRegionClick, lang = 'ru' }) => {
         center={[61.5, 95.0]} zoom={3}
         style={{ height: '100%', width: '100%', background: '#0f172a' }}
         zoomControl={true}
+        attributionControl={false}
       >
         <InjectDefs />
         {geoJson && (

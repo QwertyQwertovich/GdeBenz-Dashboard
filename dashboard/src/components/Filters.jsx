@@ -99,8 +99,8 @@ const Filters = ({ filters, setFilters, cities, lang }) => {
                   checked={selectedBrands.includes(b.name)}
                   style={{ accentColor: '#3b82f6', flexShrink: 0, pointerEvents: 'none' }}
                 />
-                <span style={{ fontSize: '13px', color: '#e2e8f0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {b.name}
+                <span style={{ fontSize: '13px', color: '#e2e8f0', flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {b.name || 'Unknown'}
                 </span>
               </div>
               <span style={{ fontSize: '11px', color: '#64748b', flexShrink: 0, marginLeft: '6px' }}>{b.count}</span>

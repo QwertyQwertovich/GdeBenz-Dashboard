@@ -24,6 +24,7 @@ function BoundsUpdater({ bounds }) {
         ], { padding: [30, 30], maxZoom: 10 });
       } catch(e) {}
     }
+    setTimeout(() => { map.invalidateSize(); }, 300);
   }, [bounds, map]);
   return null;
 }
@@ -87,10 +88,14 @@ const CityMap = ({ regionName, filters, bounds }) => {
           center={center}
           zoom={7}
           style={{ height: '100%', width: '100%', minHeight: '380px', background: '#0f172a' }}
+          attributionControl={false}
         >
           <TileLayer
-            url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
-            attribution='&copy; CARTO'
+            url={lang === 'en' 
+              ? "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
+              : "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+            }
+            attribution='&copy; <a href="https://carto.com/attributions">CARTO</a>'
           />
           {bounds && <BoundsUpdater bounds={bounds} />}
           {stations.map(s => (
