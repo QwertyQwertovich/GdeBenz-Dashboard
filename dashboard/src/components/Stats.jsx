@@ -240,7 +240,7 @@ const Stats = ({ stats, loading, isFullPage, apiRegionName, displayName, confide
 
       {isFullPage && <ConfidenceBlock confidence={confidence} lang={lang} />}
 
-      <div style={{ display: "grid", gridTemplateColumns: isFullPage ? "1fr 1.5fr" : "1fr", gap: "20px" }}>
+      <div className={isFullPage ? "stats-inner-grid full-page" : "stats-inner-grid"}>
         {/* Pie */}
         <div>
           <h3 style={{ fontSize: "13px", color: "#64748b", marginBottom: "6px", fontWeight: 600 }}>{u.distribByStatus}</h3>

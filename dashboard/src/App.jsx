@@ -156,10 +156,12 @@ function App() {
             <Filters filters={filters} setFilters={setFilters} cities={cityMap} lang={lang} />
           </aside>
 
-          <section style={{ display: 'flex', flexDirection: 'column', gap: '16px', minHeight: 0, overflow: 'auto' }}>
+          <section style={{ display: 'flex', flexDirection: 'column', gap: '16px', minHeight: 0, overflow: 'auto', flex: 1 }}>
             {isRussia ? (
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 430px', gap: '16px', flex: 1, minHeight: '500px' }}>
-                <ChoroplethMap stats={stats} onRegionClick={handleRegionClick} lang={lang} cityMap={cityMap} />
+              <div className="map-stats-grid">
+                <div style={{ display: 'flex', flexDirection: 'column', minHeight: '400px' }}>
+                  <ChoroplethMap stats={stats} onRegionClick={handleRegionClick} lang={lang} cityMap={cityMap} />
+                </div>
                 <div style={{ overflowY: 'auto' }}>
                   <Stats stats={stats} loading={loading} isFullPage={false}
                     apiRegionName="Вся Россия"
@@ -169,14 +171,14 @@ function App() {
               </div>
             ) : (
               /* Region mode: Stats left, CityMap right (2x) */
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '16px', minHeight: 0 }}>
-                <div style={{ overflow: 'auto', minHeight: 0 }}>
+              <div className="region-layout-grid">
+                <div className="region-stats-col">
                   <Stats stats={stats} loading={loading} isFullPage={true}
                     apiRegionName={regionName}
                     displayName={regionDisplayName}
                     confidence={confidence} lang={lang} />
                 </div>
-                <div style={{ minHeight: '600px' }}>
+                <div className="region-map-col">
                   <CityMap regionName={regionName} filters={filters} bounds={currentBounds} lang={lang} timeAt={timeAt} />
                 </div>
               </div>
