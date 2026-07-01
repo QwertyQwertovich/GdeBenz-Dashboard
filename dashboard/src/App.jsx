@@ -35,12 +35,6 @@ const PINNED_REGIONS = {
   'russia':       { name: 'Вся Россия',          enName: 'All Russia',         lat: 61.524,  lon: 105.318 },
   'spb':          { name: 'Санкт-Петербург',      enName: 'St. Petersburg',     lat: 59.9343, lon: 30.3351 },
   'msk':          { name: 'Москва',               enName: 'Moscow',             lat: 55.7558, lon: 37.6173 },
-  'crimea':       { name: 'Республика Крым',      enName: 'Republic of Crimea', lat: 45.2828, lon: 34.2081 },
-  'sevastopol':   { name: 'Севастополь',          enName: 'Sevastopol',         lat: 44.6166, lon: 33.5254 },
-  'dpr':          { name: 'ДНР',                  enName: 'Donetsk People\'s Republic', lat: 48.0159, lon: 37.8028 },
-  'lpr':          { name: 'ЛНР',                  enName: 'Luhansk People\'s Republic', lat: 48.574,  lon: 39.3078 },
-  'zaporizhzhia': { name: 'Запорожская область',  enName: 'Zaporizhzhia Oblast',lat: 47.1685, lon: 35.6989 },
-  'kherson':      { name: 'Херсонская область',   enName: 'Kherson Oblast',     lat: 46.5445, lon: 33.3934 },
 };
 
 function App() {
