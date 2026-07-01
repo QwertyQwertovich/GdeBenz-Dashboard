@@ -9,7 +9,7 @@ const STATUS_COLORS = {
   yes: '#10b981', low: '#facc15', queue: '#f59e0b', no: '#ef4444', unknown: '#475569'
 };
 const STATUS_LABELS_RU = {
-  yes: 'Есть топливо', low: 'Заканчивается', queue: 'Очередь', no: 'Нет топлива', unknown: 'Нет данных'
+  yes: 'Есть топливо', low: 'Мало топлива', queue: 'Очередь', no: 'Нет топлива', unknown: 'Нет данных'
 };
 const STATUS_LABELS_EN = {
   yes: 'Fuel OK', low: 'Low fuel', queue: 'Queue', no: 'No fuel', unknown: 'No data'
@@ -125,7 +125,10 @@ const CityMap = ({ regionName, filters, bounds, lang, timeAt }) => {
           </button>
           {['yes', 'low', 'queue', 'no'].map(k => (
             <div key={k} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-              <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: STATUS_COLORS[k] }} />
+              <div style={{ 
+                width: '8px', height: '8px', borderRadius: '50%', 
+                background: k === 'low' ? 'linear-gradient(90deg, #facc15 50%, #10b981 50%)' : STATUS_COLORS[k] 
+              }} />
               <span style={{ fontSize: '10px', color: '#64748b' }}>{labels[k]}</span>
             </div>
           ))}
@@ -133,6 +136,14 @@ const CityMap = ({ regionName, filters, bounds, lang, timeAt }) => {
       </div>
 
       <div style={{ flex: 1, minHeight: 0 }}>
+        <svg width="0" height="0" style={{ position: 'absolute' }}>
+          <defs>
+            <linearGradient id="half-low" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="50%" stopColor="#facc15" />
+              <stop offset="50%" stopColor="#10b981" />
+            </linearGradient>
+          </defs>
+        </svg>
         <MapContainer
           key={regionName}
           center={center}
@@ -155,7 +166,7 @@ const CityMap = ({ regionName, filters, bounds, lang, timeAt }) => {
               radius={5}
               pathOptions={{
                 color: STATUS_COLORS[s.status] || STATUS_COLORS.unknown,
-                fillColor: STATUS_COLORS[s.status] || STATUS_COLORS.unknown,
+                fillColor: s.status === 'low' ? 'url(#half-low)' : (STATUS_COLORS[s.status] || STATUS_COLORS.unknown),
                 fillOpacity: 0.85, weight: 1
               }}
             >
