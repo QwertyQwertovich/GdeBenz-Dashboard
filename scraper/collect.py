@@ -10,7 +10,7 @@ LON_MIN, LON_MAX = 19.0, 170.0
 STEP_LAT = 5.0
 STEP_LON = 5.0
 
-CYCLE_INTERVAL_HOURS = 3  # Интервал между полными обходами
+CYCLE_INTERVAL_HOURS = 1  # парсинг раз в час
 
 def fetch_stations_for_bbox(lat1, lon1, lat2, lon2):
     url = f'https://gdebenz.ru/api/stations?lat1={lat1}&lon1={lon1}&lat2={lat2}&lon2={lon2}'

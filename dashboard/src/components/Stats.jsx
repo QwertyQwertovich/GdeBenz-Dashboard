@@ -182,15 +182,12 @@ const Stats = ({ stats, loading, isFullPage, apiRegionName, displayName, confide
 
   const histProcessed = historyData.map(d => {
     const dt = new Date(d.time.replace(" ", "T") + "Z");
-    const day = String(dt.getDate()).padStart(2, '0');
-    const month = String(dt.getMonth() + 1).padStart(2, '0');
-    const hm = dt.toLocaleTimeString(lang === 'en' ? 'en-US' : 'ru-RU', { hour: "2-digit", minute: "2-digit" });
-    const time = `${day}.${month} ${hm}`;
+    const timestamp = dt.getTime();
     const u_val = ignoreUnknown ? 0 : d.unknown;
     const total = (d.yes || 0) + (d.no || 0) + (d.low || 0) + (d.queue || 0) + (u_val || 0);
     if (showPct && total > 0) {
       return {
-        time,
+        timestamp,
         [SL.yes]: Math.round((d.yes || 0) / total * 100),
         [SL.no]: Math.round((d.no || 0) / total * 100),
         [SL.low]: Math.round((d.low || 0) / total * 100),
@@ -199,7 +196,7 @@ const Stats = ({ stats, loading, isFullPage, apiRegionName, displayName, confide
       };
     }
     return {
-      time,
+      timestamp,
       [SL.yes]: d.yes || 0,
       [SL.no]: d.no || 0,
       [SL.low]: d.low || 0,
@@ -301,9 +298,16 @@ const Stats = ({ stats, loading, isFullPage, apiRegionName, displayName, confide
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={histProcessed} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
-                  <XAxis dataKey="time" stroke="#334155" tick={{ fill: "#64748b", fontSize: 10 }} interval="preserveStartEnd" />
+                  <XAxis dataKey="timestamp" type="number" scale="time" domain={['dataMin', 'dataMax']} stroke="#334155" tick={{ fill: "#64748b", fontSize: 10 }} tickFormatter={(val) => {
+                    const dt = new Date(val);
+                    return `${String(dt.getDate()).padStart(2, '0')}.${String(dt.getMonth() + 1).padStart(2, '0')} ${dt.toLocaleTimeString(lang === 'en' ? 'en-US' : 'ru-RU', { hour: "2-digit", minute: "2-digit" })}`;
+                  }} />
                   <YAxis stroke="#334155" tick={{ fill: "#64748b", fontSize: 10 }} tickFormatter={val => showPct ? `${val}%` : val} />
-                  <Tooltip contentStyle={TT_STYLE} formatter={(value, name) => [showPct ? `${value}%` : value, name]} />
+                  <Tooltip contentStyle={TT_STYLE} labelFormatter={(val) => {
+                    if (!val) return "";
+                    const dt = new Date(val);
+                    return `${String(dt.getDate()).padStart(2, '0')}.${String(dt.getMonth() + 1).padStart(2, '0')} ${dt.toLocaleTimeString(lang === 'en' ? 'en-US' : 'ru-RU', { hour: "2-digit", minute: "2-digit" })}`;
+                  }} formatter={(value, name) => [showPct ? `${value}%` : value, name]} />
                   <Legend wrapperStyle={{ fontSize: "10px" }} />
                   <Line type="monotone" dataKey={SL.yes} stroke={SC.yes} strokeWidth={2} dot={false} />
                   <Line type="monotone" dataKey={SL.low} stroke={SC.low} strokeWidth={2} dot={false} />
