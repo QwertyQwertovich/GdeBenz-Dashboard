@@ -138,7 +138,7 @@ const Stats = ({ stats, loading, isFullPage, apiRegionName, displayName, confide
   const [ignoreUnknown, setIgnoreUnknown] = useState(false);
   const [showPct, setShowPct] = useState(false);
   const [stackBrands, setStackBrands] = useState(false);
-  const [historyData, setHistoryData] = useState([]);
+  const [historyData, setHistoryData] = useState({ statuses: [], metrics: [] });
   const u = UI[lang] || UI.ru;
   const SL = LABELS[lang] || LABELS.ru;
 
@@ -180,11 +180,13 @@ const Stats = ({ stats, loading, isFullPage, apiRegionName, displayName, confide
     return { name: brand, yes: b.yes||0, low: b.low||0, queue: b.queue||0, no: b.no||0, unknown: ignoreUnknown?0:(b.unknown||0), total };
   }).sort((a, b) => b.total - a.total).slice(0, 10);
 
-  const histProcessed = historyData.map(d => {
+  const histProcessed = historyData.statuses.map(d => {
     const dt = new Date(d.time.replace(" ", "T") + "Z");
     const timestamp = dt.getTime();
     const u_val = ignoreUnknown ? 0 : d.unknown;
     const total = (d.yes || 0) + (d.no || 0) + (d.low || 0) + (d.queue || 0) + (u_val || 0);
+    const coverage = total > 0 ? Math.round(((total - (d.unknown || 0)) / total) * 100) : 0;
+    
     if (showPct && total > 0) {
       return {
         timestamp,
@@ -193,6 +195,7 @@ const Stats = ({ stats, loading, isFullPage, apiRegionName, displayName, confide
         [SL.low]: Math.round((d.low || 0) / total * 100),
         [SL.queue]: Math.round((d.queue || 0) / total * 100),
         [SL.unknown]: Math.round((u_val || 0) / total * 100),
+        coverage,
       };
     }
     return {
@@ -201,7 +204,16 @@ const Stats = ({ stats, loading, isFullPage, apiRegionName, displayName, confide
       [SL.no]: d.no || 0,
       [SL.low]: d.low || 0,
       [SL.queue]: d.queue || 0,
-      [SL.unknown]: u_val || 0,
+      [SL.unknown]: u_val,
+      coverage,
+    };
+  });
+
+  const metricsProcessed = historyData.metrics.map(d => {
+    const dt = new Date(d.time.replace(" ", "T") + "Z");
+    return {
+      timestamp: dt.getTime(),
+      avg_reports: d.avg_reports || 0
     };
   });
 
@@ -218,6 +230,61 @@ const Stats = ({ stats, loading, isFullPage, apiRegionName, displayName, confide
             <span>{p.value} ({total > 0 ? ((p.value/total)*100).toFixed(0) : 0}%)</span>
           </div>
         ))}
+
+        {/* History - Coverage Chart */}
+        {histProcessed.length > 0 && (
+          <div style={{ gridColumn: isFullPage ? "1 / -1" : undefined, marginTop: "20px" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
+              <h3 style={{ fontSize: "13px", color: "#64748b", margin: 0, fontWeight: 600 }}>{lang === 'en' ? 'Data Coverage (%)' : 'Охват данных (%)'}</h3>
+            </div>
+            <div style={{ height: "180px" }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={histProcessed} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
+                  <XAxis dataKey="timestamp" type="number" scale="time" domain={['dataMin', 'dataMax']} stroke="#334155" tick={{ fill: "#64748b", fontSize: 10 }} tickFormatter={(val) => {
+                    const dt = new Date(val);
+                    return `${String(dt.getDate()).padStart(2, '0')}.${String(dt.getMonth() + 1).padStart(2, '0')} ${dt.toLocaleTimeString(lang === 'en' ? 'en-US' : 'ru-RU', { hour: "2-digit", minute: "2-digit" })}`;
+                  }} />
+                  <YAxis stroke="#334155" domain={[0, 100]} tick={{ fill: "#64748b", fontSize: 10 }} tickFormatter={val => `${val}%`} />
+                  <Tooltip contentStyle={TT_STYLE} labelFormatter={(val) => {
+                    if (!val) return "";
+                    const dt = new Date(val);
+                    return `${String(dt.getDate()).padStart(2, '0')}.${String(dt.getMonth() + 1).padStart(2, '0')} ${dt.toLocaleTimeString(lang === 'en' ? 'en-US' : 'ru-RU', { hour: "2-digit", minute: "2-digit" })}`;
+                  }} formatter={(value) => [`${value}%`, lang === 'en' ? 'Coverage' : 'Охват']} />
+                  <Line type="monotone" dataKey="coverage" stroke="#8b5cf6" strokeWidth={2} dot={false} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        )}
+
+        {/* History - Reports/Station Chart */}
+        {metricsProcessed.length > 0 && (
+          <div style={{ gridColumn: isFullPage ? "1 / -1" : undefined, marginTop: "20px" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
+              <h3 style={{ fontSize: "13px", color: "#64748b", margin: 0, fontWeight: 600 }}>{lang === 'en' ? 'Reports per Station' : 'Репортов на АЗС'}</h3>
+            </div>
+            <div style={{ height: "180px" }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={metricsProcessed} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
+                  <XAxis dataKey="timestamp" type="number" scale="time" domain={['dataMin', 'dataMax']} stroke="#334155" tick={{ fill: "#64748b", fontSize: 10 }} tickFormatter={(val) => {
+                    const dt = new Date(val);
+                    return `${String(dt.getDate()).padStart(2, '0')}.${String(dt.getMonth() + 1).padStart(2, '0')} ${dt.toLocaleTimeString(lang === 'en' ? 'en-US' : 'ru-RU', { hour: "2-digit", minute: "2-digit" })}`;
+                  }} />
+                  <YAxis stroke="#334155" tick={{ fill: "#64748b", fontSize: 10 }} />
+                  <Tooltip contentStyle={TT_STYLE} labelFormatter={(val) => {
+                    if (!val) return "";
+                    const dt = new Date(val);
+                    return `${String(dt.getDate()).padStart(2, '0')}.${String(dt.getMonth() + 1).padStart(2, '0')} ${dt.toLocaleTimeString(lang === 'en' ? 'en-US' : 'ru-RU', { hour: "2-digit", minute: "2-digit" })}`;
+                  }} formatter={(value) => [value, lang === 'en' ? 'Reports/st' : 'Репортов/азс']} />
+                  <Line type="monotone" dataKey="avg_reports" stroke="#0ea5e9" strokeWidth={2} dot={true} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        )}
+
         <div style={{ marginTop: "4px", fontSize: "11px", color: "#64748b", borderTop: "1px solid rgba(255,255,255,0.05)", paddingTop: "4px" }}>
           Total: {total}
         </div>

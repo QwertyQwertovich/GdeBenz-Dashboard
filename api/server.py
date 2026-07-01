@@ -131,6 +131,19 @@ def get_history():
             WHERE s.region=? GROUP BY tb, st ORDER BY tb ASC
         """, (region,))
     rows = c.fetchall()
+    
+    metrics = []
+    try:
+        metrics_region = 'russia' if region in ('russia', 'Вся Россия') else region
+        c.execute("""
+            SELECT strftime('%Y-%m-%d %H:00:00', timestamp) as tb, avg_reports
+            FROM region_metrics_history
+            WHERE region=? ORDER BY tb ASC
+        """, (metrics_region,))
+        metrics = [{'time': r['tb'], 'avg_reports': r['avg_reports']} for r in c.fetchall()]
+    except:
+        pass
+
     conn.close()
     hist = {}
     for r in rows:
@@ -138,7 +151,10 @@ def get_history():
         if tb not in hist:
             hist[tb] = {'yes': 0, 'no': 0, 'low': 0, 'queue': 0, 'unknown': 0}
         hist[tb][r['st']] = r['cnt']
-    return jsonify([{'time': k, **v} for k, v in hist.items()])
+    return jsonify({
+        'statuses': [{'time': k, **v} for k, v in hist.items()],
+        'metrics': metrics
+    })
 
 @app.route('/api/stations_map', methods=['GET'])
 def get_stations_map():
@@ -293,6 +309,23 @@ def update_region_confidence_loop():
                     
                 time.sleep(1) # Be gentle to the API
                 
+            # Russia overall sample
+            russia_total_real = 0
+            russia_valid = 0
+            c.execute("SELECT id FROM stations WHERE status IS NOT NULL AND status != '' ORDER BY RANDOM() LIMIT 20")
+            russia_sample_ids = [row['id'] for row in c.fetchall()]
+            for sid in russia_sample_ids:
+                data = fetch_station_comments(sid)
+                if data:
+                    russia_total_real += data.get('realCount', 0)
+                    russia_valid += 1
+            if russia_valid > 0:
+                region_avg_reports['russia'] = round(russia_total_real / russia_valid, 1)
+
+            for r, val in region_avg_reports.items():
+                c.execute("INSERT INTO region_metrics_history (region, avg_reports) VALUES (?, ?)", (r, val))
+            
+            conn.commit()
             conn.close()
         except Exception as e:
             print("Confidence Loop Error:", e)
