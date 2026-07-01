@@ -234,59 +234,6 @@ const Stats = ({ stats, loading, isFullPage, apiRegionName, displayName, confide
           </div>
         ))}
 
-        {/* History - Coverage Chart */}
-        {histProcessed.length > 0 && (
-          <div style={{ gridColumn: isFullPage ? "1 / -1" : undefined, marginTop: "20px" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
-              <h3 style={{ fontSize: "13px", color: "#64748b", margin: 0, fontWeight: 600 }}>{lang === 'en' ? 'Data Coverage (%)' : 'Охват данных (%)'}</h3>
-            </div>
-            <div style={{ height: "180px" }}>
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={histProcessed} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
-                  <XAxis dataKey="timestamp" type="number" scale="time" domain={['dataMin', 'dataMax']} stroke="#334155" tick={{ fill: "#64748b", fontSize: 10 }} tickFormatter={(val) => {
-                    const dt = new Date(val);
-                    return `${String(dt.getDate()).padStart(2, '0')}.${String(dt.getMonth() + 1).padStart(2, '0')} ${dt.toLocaleTimeString(lang === 'en' ? 'en-US' : 'ru-RU', { hour: "2-digit", minute: "2-digit" })}`;
-                  }} />
-                  <YAxis stroke="#334155" domain={[0, 100]} tick={{ fill: "#64748b", fontSize: 10 }} tickFormatter={val => `${val}%`} />
-                  <Tooltip contentStyle={TT_STYLE} labelFormatter={(val) => {
-                    if (!val) return "";
-                    const dt = new Date(val);
-                    return `${String(dt.getDate()).padStart(2, '0')}.${String(dt.getMonth() + 1).padStart(2, '0')} ${dt.toLocaleTimeString(lang === 'en' ? 'en-US' : 'ru-RU', { hour: "2-digit", minute: "2-digit" })}`;
-                  }} formatter={(value) => [`${value}%`, lang === 'en' ? 'Coverage' : 'Охват']} />
-                  <Line type="monotone" dataKey="coverage" stroke="#8b5cf6" strokeWidth={2} dot={false} />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-        )}
-
-        {/* History - Reports/Station Chart */}
-        {metricsProcessed.length > 0 && (
-          <div style={{ gridColumn: isFullPage ? "1 / -1" : undefined, marginTop: "20px" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
-              <h3 style={{ fontSize: "13px", color: "#64748b", margin: 0, fontWeight: 600 }}>{lang === 'en' ? 'Reports per Station' : 'Репортов на АЗС'}</h3>
-            </div>
-            <div style={{ height: "180px" }}>
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={metricsProcessed} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
-                  <XAxis dataKey="timestamp" type="number" scale="time" domain={['dataMin', 'dataMax']} stroke="#334155" tick={{ fill: "#64748b", fontSize: 10 }} tickFormatter={(val) => {
-                    const dt = new Date(val);
-                    return `${String(dt.getDate()).padStart(2, '0')}.${String(dt.getMonth() + 1).padStart(2, '0')} ${dt.toLocaleTimeString(lang === 'en' ? 'en-US' : 'ru-RU', { hour: "2-digit", minute: "2-digit" })}`;
-                  }} />
-                  <YAxis stroke="#334155" tick={{ fill: "#64748b", fontSize: 10 }} />
-                  <Tooltip contentStyle={TT_STYLE} labelFormatter={(val) => {
-                    if (!val) return "";
-                    const dt = new Date(val);
-                    return `${String(dt.getDate()).padStart(2, '0')}.${String(dt.getMonth() + 1).padStart(2, '0')} ${dt.toLocaleTimeString(lang === 'en' ? 'en-US' : 'ru-RU', { hour: "2-digit", minute: "2-digit" })}`;
-                  }} formatter={(value) => [value, lang === 'en' ? 'Reports/st' : 'Репортов/азс']} />
-                  <Line type="monotone" dataKey="avg_reports" stroke="#0ea5e9" strokeWidth={2} dot={true} />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-        )}
 
         <div style={{ marginTop: "4px", fontSize: "11px", color: "#64748b", borderTop: "1px solid rgba(255,255,255,0.05)", paddingTop: "4px" }}>
           Total: {total}
@@ -384,6 +331,59 @@ const Stats = ({ stats, loading, isFullPage, apiRegionName, displayName, confide
                   <Line type="monotone" dataKey={SL.queue} stroke={SC.queue} strokeWidth={1.5} dot={false} />
                   <Line type="monotone" dataKey={SL.no} stroke={SC.no} strokeWidth={2} dot={false} />
                   {!ignoreUnknown && <Line type="monotone" dataKey={SL.unknown} stroke={SC.unknown} strokeWidth={1} dot={false} strokeDasharray="4 4" />}
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        )}
+        {/* History - Coverage Chart */}
+        {histProcessed.length > 0 && (
+          <div style={{ gridColumn: isFullPage ? "1 / -1" : undefined, marginTop: "20px" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
+              <h3 style={{ fontSize: "13px", color: "#64748b", margin: 0, fontWeight: 600 }}>{lang === 'en' ? 'Data Coverage (%)' : 'Охват данных (%)'}</h3>
+            </div>
+            <div style={{ height: "180px" }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={histProcessed} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
+                  <XAxis dataKey="timestamp" type="number" scale="time" domain={['dataMin', 'dataMax']} stroke="#334155" tick={{ fill: "#64748b", fontSize: 10 }} tickFormatter={(val) => {
+                    const dt = new Date(val);
+                    return `${String(dt.getDate()).padStart(2, '0')}.${String(dt.getMonth() + 1).padStart(2, '0')} ${dt.toLocaleTimeString(lang === 'en' ? 'en-US' : 'ru-RU', { hour: "2-digit", minute: "2-digit" })}`;
+                  }} />
+                  <YAxis stroke="#334155" domain={[0, 100]} tick={{ fill: "#64748b", fontSize: 10 }} tickFormatter={val => `${val}%`} />
+                  <Tooltip contentStyle={TT_STYLE} labelFormatter={(val) => {
+                    if (!val) return "";
+                    const dt = new Date(val);
+                    return `${String(dt.getDate()).padStart(2, '0')}.${String(dt.getMonth() + 1).padStart(2, '0')} ${dt.toLocaleTimeString(lang === 'en' ? 'en-US' : 'ru-RU', { hour: "2-digit", minute: "2-digit" })}`;
+                  }} formatter={(value) => [`${value}%`, lang === 'en' ? 'Coverage' : 'Охват']} />
+                  <Line type="monotone" dataKey="coverage" stroke="#8b5cf6" strokeWidth={2} dot={false} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        )}
+
+        {/* History - Reports/Station Chart */}
+        {metricsProcessed.length > 0 && (
+          <div style={{ gridColumn: isFullPage ? "1 / -1" : undefined, marginTop: "20px" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
+              <h3 style={{ fontSize: "13px", color: "#64748b", margin: 0, fontWeight: 600 }}>{lang === 'en' ? 'Reports per Station' : 'Репортов на АЗС'}</h3>
+            </div>
+            <div style={{ height: "180px" }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={metricsProcessed} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
+                  <XAxis dataKey="timestamp" type="number" scale="time" domain={['dataMin', 'dataMax']} stroke="#334155" tick={{ fill: "#64748b", fontSize: 10 }} tickFormatter={(val) => {
+                    const dt = new Date(val);
+                    return `${String(dt.getDate()).padStart(2, '0')}.${String(dt.getMonth() + 1).padStart(2, '0')} ${dt.toLocaleTimeString(lang === 'en' ? 'en-US' : 'ru-RU', { hour: "2-digit", minute: "2-digit" })}`;
+                  }} />
+                  <YAxis stroke="#334155" tick={{ fill: "#64748b", fontSize: 10 }} />
+                  <Tooltip contentStyle={TT_STYLE} labelFormatter={(val) => {
+                    if (!val) return "";
+                    const dt = new Date(val);
+                    return `${String(dt.getDate()).padStart(2, '0')}.${String(dt.getMonth() + 1).padStart(2, '0')} ${dt.toLocaleTimeString(lang === 'en' ? 'en-US' : 'ru-RU', { hour: "2-digit", minute: "2-digit" })}`;
+                  }} formatter={(value) => [value, lang === 'en' ? 'Reports/st' : 'Репортов/азс']} />
+                  <Line type="monotone" dataKey="avg_reports" stroke="#0ea5e9" strokeWidth={2} dot={true} />
                 </LineChart>
               </ResponsiveContainer>
             </div>
