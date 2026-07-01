@@ -390,6 +390,33 @@ const Stats = ({ stats, loading, isFullPage, apiRegionName, displayName, confide
             </div>
           </div>
         )}
+
+        {/* History - Views Growth Chart */}
+        {metricsProcessed.length > 0 && (
+          <div style={{ gridColumn: isFullPage ? "1 / -1" : undefined, marginTop: "20px" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
+              <h3 style={{ fontSize: "13px", color: "#64748b", margin: 0, fontWeight: 600 }}>{lang === 'en' ? 'Views Growth / hr' : 'Новых просмотров в час'}</h3>
+            </div>
+            <div style={{ height: "180px" }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={metricsProcessed} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
+                  <XAxis dataKey="timestamp" type="number" scale="time" domain={['dataMin', 'dataMax']} stroke="#334155" tick={{ fill: "#64748b", fontSize: 10 }} tickFormatter={(val) => {
+                    const dt = new Date(val);
+                    return `${String(dt.getDate()).padStart(2, '0')}.${String(dt.getMonth() + 1).padStart(2, '0')} ${dt.toLocaleTimeString(lang === 'en' ? 'en-US' : 'ru-RU', { hour: "2-digit", minute: "2-digit" })}`;
+                  }} />
+                  <YAxis stroke="#334155" tick={{ fill: "#64748b", fontSize: 10 }} />
+                  <Tooltip contentStyle={TT_STYLE} labelFormatter={(val) => {
+                    if (!val) return "";
+                    const dt = new Date(val);
+                    return `${String(dt.getDate()).padStart(2, '0')}.${String(dt.getMonth() + 1).padStart(2, '0')} ${dt.toLocaleTimeString(lang === 'en' ? 'en-US' : 'ru-RU', { hour: "2-digit", minute: "2-digit" })}`;
+                  }} formatter={(value) => [value, lang === 'en' ? 'Views/hr' : 'Просмотров/час']} />
+                  <Line type="monotone" dataKey="avg_views_growth" stroke="#f43f5e" strokeWidth={2} dot={true} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
