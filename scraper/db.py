@@ -55,6 +55,7 @@ def init_db():
         CREATE TABLE IF NOT EXISTS region_metrics_history (
             region TEXT,
             avg_reports REAL,
+            avg_views_growth REAL DEFAULT 0,
             timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
         )
     ''')

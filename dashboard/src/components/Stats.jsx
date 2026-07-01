@@ -216,7 +216,8 @@ const Stats = ({ stats, loading, isFullPage, apiRegionName, displayName, confide
     const dt = new Date(d.time.replace(" ", "T") + "Z");
     return {
       timestamp: dt.getTime(),
-      avg_reports: d.avg_reports || 0
+      avg_reports: d.avg_reports || 0,
+      avg_views_growth: d.avg_views_growth || 0
     };
   });
 
