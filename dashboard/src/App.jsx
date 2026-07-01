@@ -7,7 +7,7 @@ import { Filters } from './components/Filters';
 import TimeSlider from './components/TimeSlider';
 import { Fuel } from 'lucide-react';
 
-const API_URL = 'http://localhost:5000/api';
+const API_URL = import.meta.env.PROD ? "/api" : "http://localhost:5000/api";
 
 // ─── i18n ──────────────────────────────────────────────────────────────────
 export const LangCtx = createContext({ lang: 'ru', t: k => k });

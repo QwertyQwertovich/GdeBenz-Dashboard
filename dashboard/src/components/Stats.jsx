@@ -6,7 +6,7 @@ import {
   LineChart, Line
 } from "recharts";
 
-const API_URL = "http://localhost:5000/api";
+const API_URL = import.meta.env.PROD ? "/api" : import.meta.env.PROD ? "/api" : "http://localhost:5000/api";
 
 const SC = { yes: "#10b981", low: "#facc15", queue: "#f59e0b", no: "#ef4444", unknown: "#475569" };
 
