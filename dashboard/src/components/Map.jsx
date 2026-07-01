@@ -261,14 +261,14 @@ const ChoroplethMap = ({ stats, onRegionClick, lang = 'ru' }) => {
           <>
             {/* Base layer: status colors */}
             <GeoJSON
-              key={`base-${JSON.stringify(stats?.regions)}`}
+              key={`base-${lang}-${JSON.stringify(stats?.regions)}`}
               data={geoJson}
               style={baseStyle}
               onEachFeature={onEachBase}
             />
             {/* Overlay layer: hatch patterns for low-data regions */}
             <GeoJSON
-              key={`overlay-${JSON.stringify(stats?.regions)}`}
+              key={`overlay-${lang}-${JSON.stringify(stats?.regions)}`}
               data={geoJson}
               style={overlayStyle}
               onEachFeature={onEachOverlay}
