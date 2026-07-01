@@ -144,7 +144,7 @@ const Stats = ({ stats, loading, isFullPage, apiRegionName, displayName, confide
 
   useEffect(() => {
     if (apiRegionName) {
-      axios.get(`${API_URL}/history?region=${encodeURIComponent(apiRegionName)}`)
+      axios.get(`${API_URL}/history?region=${encodeURIComponent(apiRegionName)}&t=${Date.now()}`)
         .then(res => setHistoryData(res.data))
         .catch(console.error);
     }
@@ -180,7 +180,10 @@ const Stats = ({ stats, loading, isFullPage, apiRegionName, displayName, confide
     return { name: brand, yes: b.yes||0, low: b.low||0, queue: b.queue||0, no: b.no||0, unknown: ignoreUnknown?0:(b.unknown||0), total };
   }).sort((a, b) => b.total - a.total).slice(0, 10);
 
-  const histProcessed = historyData.statuses.map(d => {
+  const statusesData = Array.isArray(historyData) ? historyData : (historyData.statuses || []);
+  const metricsData = historyData.metrics || [];
+
+  const histProcessed = statusesData.map(d => {
     const dt = new Date(d.time.replace(" ", "T") + "Z");
     const timestamp = dt.getTime();
     const u_val = ignoreUnknown ? 0 : d.unknown;
@@ -209,7 +212,7 @@ const Stats = ({ stats, loading, isFullPage, apiRegionName, displayName, confide
     };
   });
 
-  const metricsProcessed = historyData.metrics.map(d => {
+  const metricsProcessed = metricsData.map(d => {
     const dt = new Date(d.time.replace(" ", "T") + "Z");
     return {
       timestamp: dt.getTime(),
