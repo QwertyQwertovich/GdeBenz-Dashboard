@@ -279,19 +279,14 @@ def update_region_confidence_loop():
                 sample_ids = [row['id'] for row in c.fetchall()]
                 
                 total_real = 0
-                total_conf = 0
                 valid = 0
                 for sid in sample_ids:
                     data = fetch_station_comments(sid)
                     if data:
-                        realCount = data.get('realCount', 0)
-                        cb = data.get('confidenceBase', 0)
-                        if cb > 0:
-                            total_real += realCount
-                            total_conf += cb
-                            valid += 1
+                        total_real += data.get('realCount', 0)
+                        valid += 1
                 
-                if total_conf > 0 and valid > 0:
+                if valid > 0:
                     region_avg_reports[r] = round(total_real / valid, 1)
                 else:
                     region_avg_reports[r] = 0

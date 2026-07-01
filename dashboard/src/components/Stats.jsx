@@ -181,8 +181,11 @@ const Stats = ({ stats, loading, isFullPage, apiRegionName, displayName, confide
   }).sort((a, b) => b.total - a.total).slice(0, 10);
 
   const histProcessed = historyData.map(d => {
-    // Append Z to parse as UTC
-    const time = new Date(d.time.replace(" ", "T") + "Z").toLocaleTimeString(lang === 'en' ? 'en-US' : 'ru-RU', { hour: "2-digit", minute: "2-digit" });
+    const dt = new Date(d.time.replace(" ", "T") + "Z");
+    const day = String(dt.getDate()).padStart(2, '0');
+    const month = String(dt.getMonth() + 1).padStart(2, '0');
+    const hm = dt.toLocaleTimeString(lang === 'en' ? 'en-US' : 'ru-RU', { hour: "2-digit", minute: "2-digit" });
+    const time = `${day}.${month} ${hm}`;
     const u_val = ignoreUnknown ? 0 : d.unknown;
     const total = (d.yes || 0) + (d.no || 0) + (d.low || 0) + (d.queue || 0) + (u_val || 0);
     if (showPct && total > 0) {
