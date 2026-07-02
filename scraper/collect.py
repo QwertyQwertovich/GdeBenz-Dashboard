@@ -1,7 +1,8 @@
 import urllib.request, json
 import time
 import random
-from db import init_db, upsert_stations
+from db import init_db, upsert_stations, get_db
+import os
 
 # Границы РФ (примерно)
 LAT_MIN, LAT_MAX = 41.0, 82.0
@@ -48,6 +49,145 @@ def run_cycle():
 
     print(f"Cycle complete. Total stations processed: {total_found}")
     return total_found
+
+
+def fetch_station_comments(sid):
+    try:
+        url = f"https://gdebenz.ru/api/comments/{sid}"
+        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0', 'Accept': 'application/json', 'Accept-Charset': 'utf-8'})
+        res = urllib.request.urlopen(req, timeout=5).read().decode('utf-8')
+        return json.loads(res)
+    except:
+        return None
+
+# --- Background Thread for Region Confidence ---
+region_avg_reports = {}
+
+def load_views_cache():
+    if os.path.exists('views_cache.json'):
+        try:
+            with open('views_cache.json', 'r') as f:
+                return json.load(f)
+        except:
+            return {}
+    return {}
+
+def save_views_cache(cache):
+    try:
+        with open('views_cache.json', 'w') as f:
+            json.dump(cache, f)
+    except:
+        pass
+
+
+def load_views_cache():
+    if os.path.exists('views_cache.json'):
+        try:
+            with open('views_cache.json', 'r') as f:
+                return json.load(f)
+        except:
+            return {}
+    return {}
+
+def save_views_cache(cache):
+    try:
+        with open('views_cache.json', 'w') as f:
+            json.dump(cache, f)
+    except:
+        pass
+
+def update_region_confidence_loop():
+    while True:
+        try:
+            conn = get_db()
+            c = conn.cursor()
+            # Get all unique regions
+            c.execute("SELECT DISTINCT region FROM stations WHERE region IS NOT NULL AND region != ''")
+            regions = [r['region'] for r in c.fetchall()]
+            
+            views_cache = load_views_cache()
+            new_views_cache = {}
+            region_avg_growth = {}
+
+            for r in regions:
+                old_sids = views_cache.get(r, {})
+                t_growth = 0
+                v_growth = 0
+                if old_sids:
+                    for sid, old_v in old_sids.items():
+                        data = fetch_station_comments(sid)
+                        if data:
+                            v = data.get('views', 0)
+                            if v >= old_v:
+                                t_growth += (v - old_v)
+                                v_growth += 1
+                
+                region_avg_growth[r] = round(t_growth / v_growth, 1) if v_growth > 0 else 0
+                
+                c.execute("SELECT id FROM stations WHERE region=? AND status IS NOT NULL AND status != '' ORDER BY RANDOM() LIMIT 10", (r,))
+                sample_ids = [row['id'] for row in c.fetchall()]
+                
+                total_real = 0
+                valid = 0
+                new_views_cache[r] = {}
+                for sid in sample_ids:
+                    data = fetch_station_comments(sid)
+                    if data:
+                        total_real += data.get('realCount', 0)
+                        valid += 1
+                        new_views_cache[r][sid] = data.get('views', 0)
+                
+                if valid > 0:
+                    region_avg_reports[r] = round(total_real / valid, 1)
+                else:
+                    region_avg_reports[r] = 0
+                    
+                time.sleep(1) # Be gentle to the API
+                
+            # Russia overall sample
+            old_sids = views_cache.get('russia', {})
+            t_growth = 0
+            v_growth = 0
+            if old_sids:
+                for sid, old_v in old_sids.items():
+                    data = fetch_station_comments(sid)
+                    if data:
+                        v = data.get('views', 0)
+                        if v >= old_v:
+                            t_growth += (v - old_v)
+                            v_growth += 1
+            region_avg_growth['russia'] = round(t_growth / v_growth, 1) if v_growth > 0 else 0
+
+            russia_total_real = 0
+            russia_valid = 0
+            new_views_cache['russia'] = {}
+            c.execute("SELECT id FROM stations WHERE status IS NOT NULL AND status != '' ORDER BY RANDOM() LIMIT 20")
+            russia_sample_ids = [row['id'] for row in c.fetchall()]
+            for sid in russia_sample_ids:
+                data = fetch_station_comments(sid)
+                if data:
+                    russia_total_real += data.get('realCount', 0)
+                    russia_valid += 1
+                    new_views_cache['russia'][sid] = data.get('views', 0)
+            if russia_valid > 0:
+                region_avg_reports['russia'] = round(russia_total_real / russia_valid, 1)
+
+            save_views_cache(new_views_cache)
+
+            for r, val in region_avg_reports.items():
+                growth = region_avg_growth.get(r, 0)
+                c.execute("INSERT INTO region_metrics_history (region, avg_reports, avg_views_growth) VALUES (?, ?, ?)", (r, val, growth))
+            
+            conn.commit()
+            conn.close()
+        except Exception as e:
+            print("Confidence Loop Error:", e)
+            
+        time.sleep(3600) # Update every hour
+
+
+import threading
+threading.Thread(target=update_region_confidence_loop, daemon=True).start()
 
 def main():
     init_db()

@@ -136,9 +136,13 @@ def get_history():
     try:
         metrics_region = 'russia' if region in ('russia', 'Вся Россия') else region
         c.execute("""
-            SELECT strftime('%Y-%m-%d %H:00:00', timestamp) as tb, avg_reports, avg_views_growth
+            SELECT strftime('%Y-%m-%d %H:00:00', timestamp) as tb, 
+                   AVG(avg_reports) as avg_reports, 
+                   AVG(avg_views_growth) as avg_views_growth
             FROM region_metrics_history
-            WHERE region=? ORDER BY tb ASC
+            WHERE region=? 
+            GROUP BY tb
+            ORDER BY tb ASC
         """, (metrics_region,))
         metrics = [{'time': r['tb'], 'avg_reports': r['avg_reports'], 'avg_views_growth': r['avg_views_growth'] or 0} for r in c.fetchall()]
     except:
@@ -278,115 +282,6 @@ def get_confidence():
         'total_stations': total_stations
     })
 
-# --- Background Thread for Region Confidence ---
-region_avg_reports = {}
-
-def load_views_cache():
-    if os.path.exists('views_cache.json'):
-        try:
-            with open('views_cache.json', 'r') as f:
-                return json.load(f)
-        except:
-            return {}
-    return {}
-
-def save_views_cache(cache):
-    try:
-        with open('views_cache.json', 'w') as f:
-            json.dump(cache, f)
-    except:
-        pass
-
-def update_region_confidence_loop():
-    while True:
-        try:
-            conn = get_db()
-            c = conn.cursor()
-            # Get all unique regions
-            c.execute("SELECT DISTINCT region FROM stations WHERE region IS NOT NULL AND region != ''")
-            regions = [r['region'] for r in c.fetchall()]
-            
-            views_cache = load_views_cache()
-            new_views_cache = {}
-            region_avg_growth = {}
-
-            for r in regions:
-                old_sids = views_cache.get(r, {})
-                t_growth = 0
-                v_growth = 0
-                if old_sids:
-                    for sid, old_v in old_sids.items():
-                        data = fetch_station_comments(sid)
-                        if data:
-                            v = data.get('views', 0)
-                            if v >= old_v:
-                                t_growth += (v - old_v)
-                                v_growth += 1
-                
-                region_avg_growth[r] = round(t_growth / v_growth, 1) if v_growth > 0 else 0
-                
-                c.execute("SELECT id FROM stations WHERE region=? AND status IS NOT NULL AND status != '' ORDER BY RANDOM() LIMIT 10", (r,))
-                sample_ids = [row['id'] for row in c.fetchall()]
-                
-                total_real = 0
-                valid = 0
-                new_views_cache[r] = {}
-                for sid in sample_ids:
-                    data = fetch_station_comments(sid)
-                    if data:
-                        total_real += data.get('realCount', 0)
-                        valid += 1
-                        new_views_cache[r][sid] = data.get('views', 0)
-                
-                if valid > 0:
-                    region_avg_reports[r] = round(total_real / valid, 1)
-                else:
-                    region_avg_reports[r] = 0
-                    
-                time.sleep(1) # Be gentle to the API
-                
-            # Russia overall sample
-            old_sids = views_cache.get('russia', {})
-            t_growth = 0
-            v_growth = 0
-            if old_sids:
-                for sid, old_v in old_sids.items():
-                    data = fetch_station_comments(sid)
-                    if data:
-                        v = data.get('views', 0)
-                        if v >= old_v:
-                            t_growth += (v - old_v)
-                            v_growth += 1
-            region_avg_growth['russia'] = round(t_growth / v_growth, 1) if v_growth > 0 else 0
-
-            russia_total_real = 0
-            russia_valid = 0
-            new_views_cache['russia'] = {}
-            c.execute("SELECT id FROM stations WHERE status IS NOT NULL AND status != '' ORDER BY RANDOM() LIMIT 20")
-            russia_sample_ids = [row['id'] for row in c.fetchall()]
-            for sid in russia_sample_ids:
-                data = fetch_station_comments(sid)
-                if data:
-                    russia_total_real += data.get('realCount', 0)
-                    russia_valid += 1
-                    new_views_cache['russia'][sid] = data.get('views', 0)
-            if russia_valid > 0:
-                region_avg_reports['russia'] = round(russia_total_real / russia_valid, 1)
-
-            save_views_cache(new_views_cache)
-
-            for r, val in region_avg_reports.items():
-                growth = region_avg_growth.get(r, 0)
-                c.execute("INSERT INTO region_metrics_history (region, avg_reports, avg_views_growth) VALUES (?, ?, ?)", (r, val, growth))
-            
-            conn.commit()
-            conn.close()
-        except Exception as e:
-            print("Confidence Loop Error:", e)
-            
-        time.sleep(3600) # Update every hour
-
-threading.Thread(target=update_region_confidence_loop, daemon=True).start()
 # -----------------------------------------------
 
 @app.route('/api/stats', methods=['GET'])
