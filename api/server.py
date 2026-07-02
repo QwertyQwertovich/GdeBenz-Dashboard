@@ -288,6 +288,17 @@ def get_confidence():
 def get_stats():
     conn = get_db()
     c = conn.cursor()
+    
+    # Fetch latest avg_reports for regions
+    c.execute("""
+        SELECT region, avg_reports 
+        FROM (
+            SELECT region, avg_reports, ROW_NUMBER() OVER(PARTITION BY region ORDER BY timestamp DESC) as rn 
+            FROM region_metrics_history
+        ) WHERE rn = 1
+    """)
+    region_avg_reports = {r['region']: r['avg_reports'] for r in c.fetchall()}
+
     region = request.args.get('region', 'russia')
     brands = request.args.getlist('brand')
     fuels = request.args.getlist('fuel')
