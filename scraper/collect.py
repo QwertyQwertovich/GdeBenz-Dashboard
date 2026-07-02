@@ -11,7 +11,7 @@ LON_MIN, LON_MAX = 19.0, 170.0
 STEP_LAT = 5.0
 STEP_LON = 5.0
 
-CYCLE_INTERVAL_HOURS = 1  # парсинг раз в час
+CYCLE_INTERVAL_HOURS = 2  # парсинг раз в час
 
 def fetch_stations_for_bbox(lat1, lon1, lat2, lon2):
     url = f'https://gdebenz.ru/api/stations?lat1={lat1}&lon1={lon1}&lat2={lat2}&lon2={lon2}'
@@ -24,77 +24,50 @@ def fetch_stations_for_bbox(lat1, lon1, lat2, lon2):
         print(f"Error fetching bbox ({lat1},{lon1} to {lat2},{lon2}): {e}")
         return []
 
+def fetch_recursive(lat1, lon1, lat2, lon2, depth=0):
+    stations = fetch_stations_for_bbox(lat1, lon1, lat2, lon2)
+    # Subdivide if we hit >= 1000 items (assuming API might limit response size)
+    if len(stations) >= 1000 and depth < 3:
+        mid_lat = (lat1 + lat2) / 2.0
+        mid_lon = (lon1 + lon2) / 2.0
+        print(f"Subdividing grid {lat1},{lon1}-{lat2},{lon2} due to {len(stations)} items limit...")
+        time.sleep(1)
+        s1 = fetch_recursive(lat1, lon1, mid_lat, mid_lon, depth+1)
+        time.sleep(1)
+        s2 = fetch_recursive(mid_lat, lon1, lat2, mid_lon, depth+1)
+        time.sleep(1)
+        s3 = fetch_recursive(lat1, mid_lon, mid_lat, lon2, depth+1)
+        time.sleep(1)
+        s4 = fetch_recursive(mid_lat, mid_lon, lat2, lon2, depth+1)
+        
+        merged = {s['id']: s for s in s1 + s2 + s3 + s4}
+        return list(merged.values())
+    return stations
+
 def run_cycle():
     total_found = 0
+    # Increase base grid to 20x20 to heavily optimize requests over empty areas
+    STEP_LAT_OPT = 20.0
+    STEP_LON_OPT = 20.0
+    
     lat = LAT_MIN
     while lat < LAT_MAX:
         lon = LON_MIN
         while lon < LON_MAX:
-            lat2 = min(lat + STEP_LAT, LAT_MAX)
-            lon2 = min(lon + STEP_LON, LON_MAX)
+            lat2 = min(lat + STEP_LAT_OPT, LAT_MAX)
+            lon2 = min(lon + STEP_LON_OPT, LON_MAX)
 
             print(f"Fetching grid: {lat},{lon} to {lat2},{lon2}")
-            stations = fetch_stations_for_bbox(lat, lon, lat2, lon2)
+            stations = fetch_recursive(lat, lon, lat2, lon2)
 
             if stations:
                 print(f"Found {len(stations)} stations. Saving to DB...")
                 upsert_stations(stations)
                 total_found += len(stations)
 
-            # Пауза 1-3 секунды, чтобы не забанили
-            time.sleep(random.uniform(1.0, 3.0))
-
-            lon += STEP_LON
-        lat += STEP_LAT
-
-    print(f"Cycle complete. Total stations processed: {total_found}")
-    return total_found
-
-
-def fetch_station_comments(sid):
-    try:
-        url = f"https://gdebenz.ru/api/comments/{sid}"
-        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0', 'Accept': 'application/json', 'Accept-Charset': 'utf-8'})
-        res = urllib.request.urlopen(req, timeout=5).read().decode('utf-8')
-        return json.loads(res)
-    except:
-        return None
-
-# --- Background Thread for Region Confidence ---
-region_avg_reports = {}
-
-def load_views_cache():
-    if os.path.exists('views_cache.json'):
-        try:
-            with open('views_cache.json', 'r') as f:
-                return json.load(f)
-        except:
-            return {}
-    return {}
-
-def save_views_cache(cache):
-    try:
-        with open('views_cache.json', 'w') as f:
-            json.dump(cache, f)
-    except:
-        pass
-
-
-def load_views_cache():
-    if os.path.exists('views_cache.json'):
-        try:
-            with open('views_cache.json', 'r') as f:
-                return json.load(f)
-        except:
-            return {}
-    return {}
-
-def save_views_cache(cache):
-    try:
-        with open('views_cache.json', 'w') as f:
-            json.dump(cache, f)
-    except:
-        pass
+            time.sleep(random.uniform(2.0, 4.0))
+            lon += STEP_LON_OPT
+        lat += STEP_LAT_OPT
 
 def update_region_confidence_loop():
     while True:
