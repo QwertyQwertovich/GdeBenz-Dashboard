@@ -1,4 +1,6 @@
-import urllib.request, json
+from curl_cffi import requests
+import json
+import platform
 import time
 import random
 from db import init_db, upsert_stations, get_db
@@ -11,14 +13,14 @@ LON_MIN, LON_MAX = 19.0, 170.0
 STEP_LAT = 5.0
 STEP_LON = 5.0
 
-CYCLE_INTERVAL_HOURS = 2  # парсинг раз в час
+CYCLE_INTERVAL_HOURS = 2  # парсинг раз в 2 часа
 
 def fetch_stations_for_bbox(lat1, lon1, lat2, lon2):
     url = f'https://gdebenz.ru/api/stations?lat1={lat1}&lon1={lon1}&lat2={lat2}&lon2={lon2}'
-    req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0', 'Accept': 'application/json', 'Accept-Charset': 'utf-8'})
     try:
-        response = urllib.request.urlopen(req, timeout=10).read().decode('utf-8')
-        data = json.loads(response)
+        proxies = {"http": "socks5://127.0.0.1:9050", "https": "socks5://127.0.0.1:9050"} if platform.system() == 'Linux' else None
+        response = requests.get(url, impersonate="chrome110", proxies=proxies, timeout=15)
+        data = response.json()
         return data
     except Exception as e:
         print(f"Error fetching bbox ({lat1},{lon1} to {lat2},{lon2}): {e}")
@@ -68,6 +70,55 @@ def run_cycle():
             time.sleep(random.uniform(2.0, 4.0))
             lon += STEP_LON_OPT
         lat += STEP_LAT_OPT
+
+    print(f"Cycle complete. Total stations processed: {total_found}")
+    return total_found
+
+
+def fetch_station_comments(sid):
+    try:
+        url = f"https://gdebenz.ru/api/comments/{sid}"
+        proxies = {"http": "socks5://127.0.0.1:9050", "https": "socks5://127.0.0.1:9050"} if platform.system() == 'Linux' else None
+        response = requests.get(url, impersonate="chrome110", proxies=proxies, timeout=15)
+        return response.json()
+    except:
+        return None
+
+# --- Background Thread for Region Confidence ---
+region_avg_reports = {}
+
+def load_views_cache():
+    if os.path.exists('views_cache.json'):
+        try:
+            with open('views_cache.json', 'r') as f:
+                return json.load(f)
+        except:
+            return {}
+    return {}
+
+def save_views_cache(cache):
+    try:
+        with open('views_cache.json', 'w') as f:
+            json.dump(cache, f)
+    except:
+        pass
+
+
+def load_views_cache():
+    if os.path.exists('views_cache.json'):
+        try:
+            with open('views_cache.json', 'r') as f:
+                return json.load(f)
+        except:
+            return {}
+    return {}
+
+def save_views_cache(cache):
+    try:
+        with open('views_cache.json', 'w') as f:
+            json.dump(cache, f)
+    except:
+        pass
 
 def update_region_confidence_loop():
     while True:
@@ -156,7 +207,7 @@ def update_region_confidence_loop():
         except Exception as e:
             print("Confidence Loop Error:", e)
             
-        time.sleep(3600) # Update every hour
+        time.sleep(CYCLE_INTERVAL_HOURS * 3600)
 
 
 import threading
