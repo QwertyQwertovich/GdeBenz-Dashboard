@@ -47,7 +47,7 @@ def fetch_recursive(lat1, lon1, lat2, lon2, depth=0):
         time.sleep(1)
         s4 = fetch_recursive(mid_lat, mid_lon, lat2, lon2, depth+1)
         
-        merged = {s['id']: s for s in s1 + s2 + s3 + s4}
+        merged = {s.get('osm_id', s.get('id', '')): s for s in s1 + s2 + s3 + s4}
         return list(merged.values())
     return stations
 
