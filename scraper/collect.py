@@ -23,6 +23,9 @@ def fetch_stations_for_bbox(lat1, lon1, lat2, lon2):
         data = response.json()
         if isinstance(data, dict) and 'data' in data:
             data = data['data']
+        if not isinstance(data, list):
+            print(f"Unexpected response format: {data}")
+            return []
         return data
     except Exception as e:
         print(f"Error fetching bbox ({lat1},{lon1} to {lat2},{lon2}): {e}")
@@ -50,9 +53,9 @@ def fetch_recursive(lat1, lon1, lat2, lon2, depth=0):
 
 def run_cycle():
     total_found = 0
-    # Increase base grid to 20x20 to heavily optimize requests over empty areas
-    STEP_LAT_OPT = 20.0
-    STEP_LON_OPT = 20.0
+    # Increase base grid to 10x10 to heavily optimize requests over empty areas
+    STEP_LAT_OPT = 10.0
+    STEP_LON_OPT = 10.0
     
     lat = LAT_MIN
     while lat < LAT_MAX:
