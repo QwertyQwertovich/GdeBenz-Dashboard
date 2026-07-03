@@ -19,7 +19,7 @@ def fetch_stations_for_bbox(lat1, lon1, lat2, lon2):
     url = f'https://gdebenz.ru/api/stations?lat1={lat1}&lon1={lon1}&lat2={lat2}&lon2={lon2}'
     try:
         proxies = {"http": "socks5://127.0.0.1:9050", "https": "socks5://127.0.0.1:9050"} if platform.system() == 'Linux' else None
-        response = requests.get(url, impersonate="chrome110", proxies=proxies, timeout=15)
+        response = requests.get(url, impersonate="chrome110", proxies=proxies, timeout=30)
         data = response.json()
         if isinstance(data, dict) and 'data' in data:
             data = data['data']
@@ -81,7 +81,7 @@ def fetch_station_comments(sid):
     try:
         url = f"https://gdebenz.ru/api/comments/{sid}"
         proxies = {"http": "socks5://127.0.0.1:9050", "https": "socks5://127.0.0.1:9050"} if platform.system() == 'Linux' else None
-        response = requests.get(url, impersonate="chrome110", proxies=proxies, timeout=15)
+        response = requests.get(url, impersonate="chrome110", proxies=proxies, timeout=30)
         return response.json()
     except:
         return None
