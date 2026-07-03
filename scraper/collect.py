@@ -21,6 +21,8 @@ def fetch_stations_for_bbox(lat1, lon1, lat2, lon2):
         proxies = {"http": "socks5://127.0.0.1:9050", "https": "socks5://127.0.0.1:9050"} if platform.system() == 'Linux' else None
         response = requests.get(url, impersonate="chrome110", proxies=proxies, timeout=15)
         data = response.json()
+        if isinstance(data, dict) and 'data' in data:
+            data = data['data']
         return data
     except Exception as e:
         print(f"Error fetching bbox ({lat1},{lon1} to {lat2},{lon2}): {e}")
